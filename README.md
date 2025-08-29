@@ -1,28 +1,15 @@
-# Geo Map
+# Mind Map
 
-Geo Map is a preset for the Moodle activity database.
-
-Leaflet, a JS library for interactive maps. https://leafletjs.com
-(c) 2010-2022 Vladimir Agafonkin, (c) 2010-2011 CloudMade
+Mind Map is a preset for the Moodle activity database.
 
 ## Description
 
-Users can add markers on an OpenStreetMap.
+Users can create a mind map.
 
 ## Getting started
 
-In the list view template, you can specify the zoom level and map orientation using the coordinate:
-<br>
-<code>
-    // Kartenebenen: 1 = OpenStreetMap, 2 = Topographische Karte, 3 = Luftbild, 4 = ÖPNV, 5 = Stumme Karte (Map layer)
-     let maplayer = 1; 
-    // Zoomstufe der Karte (Zoom level)
-     let zoom = 2.4; 
-    // Koordinate zum Ausrichten der Karte (Coordinate)
-     let center = [0, 0];
-     </code>
-<br>
-Don't forget to switch off the editor first!
+Download the [release file](https://github.com/fdagner/mindmap_moodle-database-preset-/releases). 
+Create a "Database" activity in Moodle and then upload the ZIP file.
 
 ## Language Support
 
