@@ -1,0 +1,447 @@
+</div>
+
+
+<script>
+
+    // Function for calculating the relative luminance of a color
+    function calculateLuminance(hex) {
+        const rgb = hexToRgb(hex);
+        const [r, g, b] = rgb.map(c => {
+            c = c / 255;
+            return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+        });
+        return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    }
+
+    // Converts hex color to RGB
+    function hexToRgb(hex) {
+        hex = hex.replace(/^#/, '');
+        if (hex.length === 3) hex = hex.split('').map(c => c + c).join('');
+        const bigint = parseInt(hex, 16);
+        return [(bigint >> 16) & 255, (bigint >> 8) & 255, bigint & 255];
+    }
+
+    // Selects text color based on background color
+    function getContrastTextColor(bgColor) {
+        const luminance = calculateLuminance(bgColor);
+        return luminance > 0.5 ? '#000000' : '#ffffff';
+    }
+
+    // Node validation
+    const validateNodeText = (text) => {
+        if (!text.trim()) return false;
+        if (text.length > MAX_TEXT_LENGTH) return false;
+        if (/<[a-zA-Z0-9\s="/]*(>|\/>|on[a-zA-Z]+=["'])|[|~<>]/i.test(text)) return false;
+        return true;
+    };
+
+    // Initializes mind map data from Mermaid code
+    const initializeFromMermaidCode = (codeInput) => {
+        let mindmapData = [];
+        nodeCounter = 0;
+        let levelMap = {};
+        let branchIndexCounter = 0;
+
+        const lines = codeInput.split('|').map(line => line.trimEnd()).filter(line => line.trim().length > 0);
+
+        if (!codeInput.trim() || lines.length === 0 || (lines.length === 1 && lines[0].trim() === 'mindmap')) {
+            const defaultRootNode = {
+                id: nodeCounter++,
+                text: 'Hauptknoten',
+                level: 0,
+                parent: null,
+                order: 0,
+                branchIndex: 0
+            };
+            mindmapData.push(defaultRootNode);
+            return mindmapData;
+        }
+
+        if (!lines[0] || lines[0].trim() !== 'mindmap') {
+            lines.unshift('mindmap');
+        }
+
+        lines.forEach((line) => {
+            if (line.trim() === 'mindmap') return;
+
+            const match = line.match(/^(~*)[^~]*/);
+            if (!match) return;
+            const level = match[1] ? match[1].length : 0;
+            const textWithIndent = match[0];
+
+            if (level > MAX_LEVEL) return;
+
+            let parentId = null;
+            if (level > 0) {
+                for (let i = level - 1; i >= 0; i--) {
+                    if (levelMap[i] !== undefined) {
+                        parentId = levelMap[i];
+                        break;
+                    }
+                }
+            }
+
+            if (parentId !== null) {
+                const childrenCount = mindmapData.filter(node => node.parent === parentId).length;
+                if (childrenCount >= MAX_CHILDREN_PER_NODE) return;
+            }
+
+            let text = textWithIndent.replace(/^~*/, '').trim();
+            if (text.startsWith('root(') && text.endsWith(')')) {
+                text = text.slice(5, -1);
+            }
+
+            if (!validateNodeText(text)) return;
+
+            const siblings = mindmapData.filter(n => n.parent === parentId);
+            const order = siblings.length;
+
+            const branchIndex = level === 0 ? 0 :
+                level === 1 ? branchIndexCounter++ :
+                    mindmapData.find(n => n.id === parentId)?.branchIndex || 0;
+
+            const newNode = {
+                id: nodeCounter++,
+                text: text,
+                level: level,
+                parent: parentId,
+                order: order,
+                branchIndex: branchIndex
+            };
+
+            mindmapData.push(newNode);
+            levelMap[level] = newNode.id;
+
+            Object.keys(levelMap).forEach(key => {
+                if (parseInt(key) > level) {
+                    delete levelMap[key];
+                }
+            });
+        });
+
+        if (mindmapData.length === 0) {
+            const defaultRootNode = {
+                id: nodeCounter++,
+                text: 'Hauptknoten',
+                level: 0,
+                parent: null,
+                order: 0,
+                branchIndex: 0
+            };
+            mindmapData.push(defaultRootNode);
+        }
+
+        return mindmapData;
+    };
+
+    // Create tree structure from data
+    const buildTreeFromData = (mindmapData) => {
+        const nodesMap = new Map(mindmapData.map(node => [node.id, { ...node, children: [] }]));
+        let root = null;
+        nodesMap.forEach(node => {
+            if (node.level === 0) root = node;
+            if (node.parent !== null) {
+                const parent = nodesMap.get(node.parent);
+                if (parent) parent.children.push(node);
+            }
+        });
+        const sortChildren = node => {
+            node.children.sort((a, b) => (a.order || 0) - (b.order || 0));
+            node.children.forEach(sortChildren);
+        };
+        if (root) sortChildren(root);
+        return root;
+    };
+
+    // Assign colors for branches
+    const assignBranchColors = (node, branchColors) => {
+        const colorScheme = branchColors;
+        node.color = node.level === 0 ? colorScheme.level0 :
+            node.level === 1 ? colorScheme.colors[node.branchIndex % colorScheme.colors.length] :
+                node.level === 2 ? colorScheme.colors[node.branchIndex % colorScheme.colors.length] :
+                    '#ffffff';
+        node.textColor = getContrastTextColor(node.color);
+        node.borderColor = node.level === 0 ? colorScheme.level0 : colorScheme.colors[node.branchIndex % colorScheme.colors.length];
+        node.children.forEach((child, index) => {
+            child.branchIndex = node.level === 0 ? index : node.branchIndex;
+            assignBranchColors(child, branchColors);
+        });
+    };
+
+    // Measure text width
+    const measureTextWidth = (text, fontSize = 14, fontFamily = 'Inter, system-ui, sans-serif') => {
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
+        context.font = `${fontSize}px ${fontFamily}`;
+        return context.measureText(text).width;
+    };
+
+    // Lange Wörter aufteilen
+    const splitLongWord = (word, maxWidth, fontSize, fontFamily = 'Inter, system-ui, sans-serif') => {
+        const chars = word.split('');
+        const result = [];
+        let current = '';
+
+        for (let i = 0; i < chars.length; i++) {
+            const test = current + chars[i];
+            if (measureTextWidth(test, fontSize, fontFamily) <= maxWidth) {
+                current += chars[i];
+            } else {
+                if (current.length > 0) {
+                    result.push(current + (i < chars.length - 1 ? '-' : ''));
+                    current = chars[i];
+                } else {
+                    result.push(chars[i] + (i < chars.length - 1 ? '-' : ''));
+                    current = '';
+                }
+            }
+        }
+        if (current.length > 0) result.push(current);
+        return result;
+    };
+
+    // Calculate sub-tree size
+    const calculateSubtreeSize = (node) => {
+        const fontSize = Math.max(12, 18 - node.level);
+        const maxWidth = 200;
+        const words = node.text.split(' ').flatMap(word => {
+            if (measureTextWidth(word, fontSize) > maxWidth) {
+                return splitLongWord(word, maxWidth, fontSize);
+            }
+            return word;
+        });
+        let line = '';
+        const lines = [];
+
+        words.forEach(word => {
+            const testLine = line + word + ' ';
+            if (measureTextWidth(testLine, fontSize) > maxWidth && line.length > 0) {
+                lines.push(line.trim());
+                line = word + ' ';
+            } else {
+                line = testLine;
+            }
+        });
+        if (line.length > 0) lines.push(line.trim());
+
+        const lineHeight = fontSize * 1.2;
+        node.height = lines.length * lineHeight + 20;
+        node.width = Math.max(100, maxWidth + 20);
+
+        if (!node.children.length) {
+            node.subtreeWidth = node.width;
+            node.subtreeHeight = node.height;
+            return;
+        }
+        node.children.forEach(calculateSubtreeSize);
+        const spacing = Math.max(10, ...node.children.map(child => child.height * 0.5));
+        node.subtreeHeight = node.children.reduce((sum, child) => sum + child.subtreeHeight, 0) + Math.max(0, node.children.length - 1) * spacing;
+        node.subtreeWidth = node.width + 100 + Math.max(...node.children.map(c => c.subtreeWidth));
+    };
+
+    // Position nodes
+    const positionNode = (node, x, y, direction) => {
+        if (typeof node.x === 'undefined') {
+            node.x = direction === 'left' ? x - node.width : x;
+        }
+        node.y = y + (node.subtreeHeight - node.height) / 2;
+        const spacing = Math.max(10, ...node.children.map(child => child.height * 0.5));
+        let currentY = y;
+        node.children.sort((a, b) => (a.order || 0) - (b.order || 0));
+        node.children.forEach(child => {
+            const childDirection = child.direction || direction;
+            const offset = 100;
+            const childX = childDirection === 'right' ? node.x + node.width + offset : node.x - offset;
+            positionNode(child, childX, currentY, childDirection);
+            currentY += child.subtreeHeight + spacing;
+        });
+    };
+
+    // Layout berechnen
+    const calculateLayout = (node, level = 0) => {
+        if (level === 0) {
+            calculateSubtreeSize(node);
+            let rightChildren = [];
+            let leftChildren = [];
+            node.children.sort((a, b) => (a.order || 0) - (b.order || 0));
+            node.children.forEach((child, index) => {
+                child.direction = index % 2 === 0 ? 'right' : 'left';
+                if (child.direction === 'right') rightChildren.push(child);
+                else leftChildren.push(child);
+            });
+
+            const spacing = Math.max(10, ...node.children.map(child => child.height * 0.5));
+
+            let rightTotalHeight = rightChildren.reduce((sum, c) => sum + c.subtreeHeight, 0) + Math.max(0, rightChildren.length - 1) * spacing;
+            let leftTotalHeight = leftChildren.reduce((sum, c) => sum + c.subtreeHeight, 0) + Math.max(0, leftChildren.length - 1) * spacing;
+            let maxTotalHeight = Math.max(leftTotalHeight, rightTotalHeight, node.height);
+
+            const maxRightWidth = rightChildren.reduce((max, c) => Math.max(max, c.subtreeWidth), 0);
+            const maxLeftWidth = leftChildren.reduce((max, c) => Math.max(max, c.subtreeWidth), 0);
+            const maxBranchWidth = Math.max(maxRightWidth, maxLeftWidth);
+            const totalWidth = node.width + 2 * maxBranchWidth + 200;
+
+            node.x = maxBranchWidth + 100;
+            node.y = maxTotalHeight / 2 - node.height / 2;
+
+            let rightY = node.y + node.height / 2 - rightTotalHeight / 2;
+            rightChildren.forEach(child => {
+                positionNode(child, node.x + node.width + 100, rightY, 'right');
+                rightY += child.subtreeHeight + spacing;
+            });
+
+            let leftY = node.y + node.height / 2 - leftTotalHeight / 2;
+            leftChildren.forEach(child => {
+                const rightEdgeX = node.x - 100;
+                positionNode(child, rightEdgeX, leftY, 'left');
+                leftY += child.subtreeHeight + spacing;
+            });
+        }
+    };
+
+    // Calculate connection points
+    const getConnectionPoint = (fromNode, toNode) => {
+        const fromCenterX = fromNode.x + fromNode.width / 2;
+        const fromCenterY = fromNode.y + fromNode.height / 2;
+        const toCenterX = toNode.x + toNode.width / 2;
+        const toCenterY = toNode.y + toNode.height / 2;
+        const dx = toCenterX - fromCenterX;
+        const dy = toCenterY - fromCenterY;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        const normalizedDx = dx / distance;
+        const normalizedDy = dy / distance;
+        return {
+            fromX: fromCenterX + normalizedDx * (fromNode.width / 2),
+            fromY: fromCenterY + normalizedDy * (fromNode.height / 2),
+            toX: toCenterX - normalizedDx * (toNode.width / 2),
+            toY: toCenterY - normalizedDy * (toNode.height / 2)
+        };
+    };
+
+    // Generate SVG
+    const generateSVG = (root, branchColors) => {
+        if (!root) return '';
+        const padding = 100;
+        assignBranchColors(root, branchColors);
+        calculateLayout(root);
+        const { minX, minY, maxX, maxY } = getBounds(root);
+        const width = maxX - minX + padding * 2;
+        const height = maxY - minY + padding * 2;
+        let svg = `<svg width="${width}" height="${height}" viewBox="${minX - padding} ${minY - padding} ${width} ${height}" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">`;
+        const drawConnections = node => {
+            node.children.forEach(child => {
+                const { fromX, fromY, toX, toY } = getConnectionPoint(node, child);
+                svg += `<line x1="${fromX}" y1="${fromY}" x2="${toX}" y2="${toY}" stroke="${branchColors.colors[child.branchIndex % branchColors.colors.length] || '#667eea'}" stroke-width="2" stroke-linecap="round"/>`;
+                drawConnections(child);
+            });
+        };
+        const drawNodes = node => {
+            const { fillColor, fillOpacity, strokeColor, textColor, strokeWidth, strokeDasharray } = node.level === 0
+                ? { fillColor: branchColors.level0, strokeColor: branchColors.level0, textColor: node.textColor, strokeWidth: 2, strokeDasharray: 'none' }
+                : node.level === 1
+                    ? { fillColor: branchColors.colors[node.branchIndex % branchColors.colors.length], strokeColor: branchColors.colors[node.branchIndex % branchColors.colors.length], textColor: node.textColor, strokeWidth: 2, strokeDasharray: 'none' }
+                    : node.level === 2
+                        ? { fillColor: branchColors.colors[node.branchIndex % branchColors.colors.length], fillOpacity: '0.6', strokeColor: branchColors.colors[node.branchIndex % branchColors.colors.length], textColor: node.textColor, strokeWidth: 2, strokeDasharray: '5,3' }
+                        : { fillColor: '#ffffff', strokeColor: branchColors.colors[node.branchIndex % branchColors.colors.length], textColor: node.textColor, strokeWidth: 2, strokeDasharray: '5,3' };
+            svg += `<rect data-node-id="${node.id}" class="node-rect" x="${node.x}" y="${node.y}" width="${node.width}" height="${node.height}" rx="8" fill="${fillColor}" fill-opacity="${fillOpacity}" stroke="${strokeColor}" stroke-width="${strokeWidth}" stroke-dasharray="${strokeDasharray}"/>`;
+            const words = node.text.split(' ').flatMap(word => {
+                const fontSize = Math.max(12, 18 - node.level);
+                if (measureTextWidth(word, fontSize) > 200) {
+                    return splitLongWord(word, 200, fontSize);
+                }
+                return word;
+            });
+            let line = '';
+            const lines = [];
+            const maxWidth = 200;
+            const fontSize = Math.max(12, 18 - node.level);
+            words.forEach(word => {
+                const testLine = line + word + ' ';
+                if (measureTextWidth(testLine, fontSize) > maxWidth && line.length > 0) {
+                    lines.push(line.trim());
+                    line = word + ' ';
+                } else {
+                    line = testLine;
+                }
+            });
+            if (line.length > 0) lines.push(line.trim());
+            const lineHeight = fontSize * 1.2;
+            const totalTextHeight = lines.length * lineHeight;
+            const startY = node.y + (node.height - totalTextHeight) / 2 + lineHeight * 0.7;
+            lines.forEach((textLine, index) => {
+                svg += `<text data-node-id="${node.id}" class="node-text" x="${node.x + node.width / 2}" y="${startY + index * lineHeight}" font-size="${fontSize}" font-family="Inter, system-ui, sans-serif" fill="${textColor}" text-anchor="middle" font-weight="${node.level === 0 ? '600' : '400'}">${textLine}</text>`;
+            });
+            node.children.forEach(drawNodes);
+        };
+        drawConnections(root);
+        drawNodes(root);
+        svg += '</svg>';
+        return svg;
+    };
+
+    // Grenzen berechnen
+    const getBounds = root => {
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        const updateBounds = node => {
+            minX = Math.min(minX, node.x);
+            minY = Math.min(minY, node.y);
+            maxX = Math.max(maxX, node.x + node.width);
+            maxY = Math.max(maxY, node.y + node.height);
+            node.children.forEach(updateBounds);
+        };
+        updateBounds(root);
+        return { minX, minY, maxX, maxY };
+    };
+
+    // Render mind maps
+    const renderMindmaps = () => {
+        const inputElements = document.querySelectorAll('.export-input');
+
+        inputElements.forEach((input) => {
+            const inputId = input.id;
+            const svgContainer = document.getElementById(`svgContainer-${inputId}`);
+            const colorElement = document.getElementById(`color-${inputId}`);
+            let branchColors = BRANCH_COLORS_SCHEMES['Standard']; // Fallback auf Standard-Schema
+
+            if (colorElement && colorElement.innerText.trim() && BRANCH_COLORS_SCHEMES[colorElement.innerText.trim()]) {
+                branchColors = BRANCH_COLORS_SCHEMES[colorElement.innerText.trim()];
+            }
+
+            svgContainer.innerHTML = '<div class="loading">Rendere Mindmap...</div>';
+
+            try {
+                const mindmapData = initializeFromMermaidCode(input.value);
+                const root = buildTreeFromData(mindmapData);
+                const svg = generateSVG(root, branchColors);
+                const rootTextValue = root ? root.text : 'Hauptknoten';
+                const rootTextElement = document.getElementById(`root-text-${inputId}`);
+
+                if (rootTextElement) {
+                    rootTextElement.innerHTML = `<h3 class="root-text">${rootTextValue}</h3>`;
+                }
+                svgContainer.innerHTML = `
+                    <div class="mindmap-container">${svg}</div>`;
+            } catch (error) {
+                const mermaidCode = input.value.split('|').map(line => {
+                    const match = line.match(/^(~*)[^~]*/);
+                    return match ? '  '.repeat(match[1]?.length || 0) + match[0].replace(/^~*/, '') : line;
+                }).join('\n');
+                svgContainer.innerHTML = `
+                    <div class="mindmap-container">
+                        <div style="background: #f1f3f4; padding: 20px; border-radius: 12px; border-left: 4px solid #dc2626;">
+                            <h4 style="margin: 0 0 10px 0; color: #dc2626;">⚠️ Vorschau nicht verfügbar</h4>
+                            <p style="color: #6b7280; margin: 0 0 15px 0; font-size: 14px;">Rendering-Fehler: ${error.message}</p>
+                            <h5 style="margin: 15px 0 10px 0; color: #1f2937;">📋 Generierter Code:</h5>
+                            <pre style="background: white; padding: 15px; border-radius: 8px; font-family: 'Courier New', monospace; font-size: 13px; line-height: 1.4; overflow-x: auto; margin: 0; border: 1px solid #e5e7eb;">${mermaidCode}</pre>
+                        </div>
+                    </div>
+                `;
+            }
+        });
+    };
+
+    // Initialization
+    document.addEventListener('DOMContentLoaded', () => {
+        renderMindmaps();
+    });
+</script>
