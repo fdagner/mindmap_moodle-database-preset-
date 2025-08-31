@@ -91,29 +91,6 @@
         const mermaidInput = document.getElementById('[[mermaid_text#id]]');
         const welcomeMessage = document.getElementById('welcomeMessage');
 
-        // Function for calculating the relative luminance of a color
-        function calculateLuminance(hex) {
-            const rgb = hexToRgb(hex);
-            const [r, g, b] = rgb.map(c => {
-                c = c / 255;
-                return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
-            });
-            return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-        }
-
-        // Converts hex color to RGB
-        function hexToRgb(hex) {
-            hex = hex.replace(/^#/, '');
-            if (hex.length === 3) hex = hex.split('').map(c => c + c).join('');
-            const bigint = parseInt(hex, 16);
-            return [(bigint >> 16) & 255, (bigint >> 8) & 255, bigint & 255];
-        }
-
-        // Selects text color based on background color
-        function getContrastTextColor(bgColor) {
-            const luminance = calculateLuminance(bgColor);
-            return luminance > 0.5 ? '#000000' : '#ffffff';
-        }
 
         // Function for setting the color scheme
         function setColorScheme() {
@@ -892,37 +869,6 @@
             });
         };
 
-        // Measure text width
-        const measureTextWidth = (text, fontSize = 14, fontFamily = 'Inter, system-ui, sans-serif') => {
-            const canvas = document.createElement('canvas');
-            const context = canvas.getContext('2d');
-            context.font = `${fontSize}px ${fontFamily}`;
-            return context.measureText(text).width;
-        };
-
-        // Split long words
-        const splitLongWord = (word, maxWidth, fontSize, fontFamily = 'Inter, system-ui, sans-serif') => {
-            const chars = word.split('');
-            const result = [];
-            let current = '';
-
-            for (let i = 0; i < chars.length; i++) {
-                const test = current + chars[i];
-                if (measureTextWidth(test, fontSize, fontFamily) <= maxWidth) {
-                    current += chars[i];
-                } else {
-                    if (current.length > 0) {
-                        result.push(current + (i < chars.length - 1 ? '-' : ''));
-                        current = chars[i];
-                    } else {
-                        result.push(chars[i] + (i < chars.length - 1 ? '-' : ''));
-                        current = '';
-                    }
-                }
-            }
-            if (current.length > 0) result.push(current);
-            return result;
-        };
 
         const countNodes = node => 1 + node.children.reduce((sum, child) => sum + countNodes(child), 0);
 

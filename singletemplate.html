@@ -9,7 +9,7 @@
     }
 </style>
 
-<div class="main-content">
+<div class="main-content" id="fullscreen_mindmap">
     <h3>##actionsmenu##Mindmap von ##user##</h3>
     <div class="zoom-controls">
         <div class="mindmap">
@@ -22,6 +22,8 @@
                         class="fa-solid fa-magnifying-glass-minus"></i></button>
                 <button type="button" class="btn btn-light" onclick="resetZoom()" title="Zoom zurücksetzen"><i
                         class="fa-solid fa-arrows-to-circle"></i></button>
+                <button type="button" class="btn btn-light" onclick="toggleFullscreen()" titel="Präsentationsmodus"><i
+                        class="fa-solid fa-person-chalkboard"></i></button>
                 <button type="button" class="btn btn-light" onclick="exportAsSVG()" title="Als SVG exportieren"><i
                         class="fa-solid fa-file"></i></button>
                 <button type="button" class="btn btn-light" onclick="copyMermaidCode()" title="Mermaid-Code kopieren"><i
@@ -93,29 +95,6 @@
         const mermaidInput = document.getElementById('##id##');
         const welcomeMessage = document.getElementById('welcomeMessage');
 
-        // Function for calculating the relative luminance of a color
-        function calculateLuminance(hex) {
-            const rgb = hexToRgb(hex);
-            const [r, g, b] = rgb.map(c => {
-                c = c / 255;
-                return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
-            });
-            return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-        }
-
-        // Converts hex color to RGB
-        function hexToRgb(hex) {
-            hex = hex.replace(/^#/, '');
-            if (hex.length === 3) hex = hex.split('').map(c => c + c).join('');
-            const bigint = parseInt(hex, 16);
-            return [(bigint >> 16) & 255, (bigint >> 8) & 255, bigint & 255];
-        }
-
-        // Selects text color based on background color
-        function getContrastTextColor(bgColor) {
-            const luminance = calculateLuminance(bgColor);
-            return luminance > 0.5 ? '#000000' : '#ffffff';
-        }
 
         // Function for setting the color scheme
         function setColorScheme() {
@@ -399,12 +378,13 @@
             renderEditor();
         }
 
-        // Collapse/expand function for Level 1 nodes
+        // Collapse/expand function for Level 1 nodes - UPDATED to also render mindmap
         const toggleCollapse = (nodeId) => {
             const node = mindmapData.find(n => n.id === nodeId);
             if (!node || node.level !== 1) return;
             node.isCollapsed = !node.isCollapsed;
             renderEditor();
+            renderMindmap(); // Added this line to update SVG as well
         };
 
         // Checks whether a node is visible based on the isCollapsed state of its ancestors
@@ -477,32 +457,13 @@
                    data-node-id="${node.id}">
         `;
 
-                nodeDiv.addEventListener('dragstart', handleDragStart);
-                nodeDiv.addEventListener('touchstart', handleDragStart, { passive: false });
-                nodeDiv.addEventListener('dragover', handleDragOver);
-                nodeDiv.addEventListener('drop', handleDrop);
-                nodeDiv.addEventListener('dragend', handleDragEnd);
-                nodeDiv.addEventListener('dragenter', e => e.preventDefault());
-                nodeDiv.addEventListener('dragleave', e => !e.target.closest('.node').contains(e.relatedTarget) && e.target.closest('.node').classList.remove('drag-over-child'));
-                nodeDiv.addEventListener('touchmove', handleTouchMove, { passive: false });
-                nodeDiv.addEventListener('touchend', handleTouchEnd, { passive: false });
 
                 const inputElement = nodeDiv.querySelector('.node-input');
                 const addBtn = nodeDiv.querySelector('.add-btn');
                 const deleteBtn = nodeDiv.querySelector('.delete-btn');
                 const collapseIconElement = nodeDiv.querySelector('.collapse-icon');
 
-                [inputElement, addBtn, deleteBtn, collapseIconElement].forEach(el => {
-                    if (el) {
-                        el.addEventListener('dragstart', e => e.stopPropagation());
-                        el.addEventListener('touchstart', e => e.stopPropagation(), { passive: false });
-                    }
-                });
 
-                if (addBtn) {
-                    addBtn.addEventListener('dragover', handleDropZoneDragOver);
-                    addBtn.addEventListener('drop', e => handleDropZoneDrop(e, node.id, 'child'));
-                }
 
                 let isDragging = false;
 
@@ -544,253 +505,7 @@
             });
         };
 
-        // Node management
-        const addChildNode = parentId => {
-            const parent = mindmapData.find(node => node.id === parentId);
-            if (!parent) return;
-            if (parent.level >= MAX_LEVEL) return showErrorModal(`Die maximale Tiefe von ${MAX_LEVEL} Ebenen wurde erreicht.`);
-            if (mindmapData.filter(node => node.parent === parentId).length >= MAX_CHILDREN_PER_NODE) {
-                return showErrorModal(`Der Elternknoten hat bereits die maximale Anzahl von ${MAX_CHILDREN_PER_NODE} Unterknoten erreicht.`);
-            }
-            const siblings = mindmapData.filter(node => node.parent === parentId);
-            const newNode = {
-                id: nodeCounter++,
-                text: 'Neuer Knoten',
-                level: parent.level + 1,
-                parent: parentId,
-                order: siblings.length > 0 ? Math.max(...siblings.map(s => s.order || 0)) + 1 : 0,
-                branchIndex: parent.level === 0 ? siblings.length : parent.branchIndex,
-                isCollapsed: parent.level === 1 ? false : undefined
-            };
-            mindmapData.push(newNode);
-            if (parent.level === 1) parent.isCollapsed = false;
-            renderEditor();
-            renderMindmap();
-            setTimeout(() => document.querySelector(`input[onchange*="${newNode.id}"]`)?.focus()?.select(), 100);
-            if (welcomeMessage && parent.level === 0) welcomeMessage.style.display = 'none'; // Hide message when adding a child to root
-        };
 
-        const showDeleteModal = nodeId => {
-            nodeToDelete = parseInt(nodeId);
-            const node = mindmapData.find(n => n.id === nodeToDelete);
-            if (!node) {
-                nodeToDelete = null;
-                return showErrorModal('Der ausgewählte Knoten wurde nicht gefunden.');
-            }
-            const hasChildren = mindmapData.some(n => n.parent === nodeToDelete);
-            const buttons = node.level === 0 ? `
-                <button type="button" class="btn btn-secondary" onclick="closeDeleteModal()">Abbrechen</button>
-                <button type="button" class="btn btn-danger" onclick="confirmDelete(true, ${node.id})">Gesamte Mindmap löschen</button>
-            ` : hasChildren ? `
-                <button type="button" class="btn btn-secondary" onclick="closeDeleteModal()">Abbrechen</button>
-                <button type="button" class="btn btn-danger" onclick="confirmDelete(false, ${node.id})">Nur diesen Knoten</button>
-                <button type="button" class="btn btn-danger" onclick="confirmDelete(true, ${node.id})">Gesamten Ast</button>
-            ` : `
-                <button type="button" class="btn btn-secondary" onclick="closeDeleteModal()">Abbrechen</button>
-                <button type="button" class="btn btn-danger" onclick="confirmDelete(false, ${node.id})">Knoten löschen</button>
-            `;
-            showModal('deleteModal', node.level === 0 ? 'Achtung, der Hauptknoten löscht die gesamte Mindmap.' :
-                hasChildren ? 'Möchtest du nur diesen Knoten oder den gesamten Ast (inklusive Unterknoten) löschen?' :
-                    'Möchtest du diesen Knoten löschen?', buttons);
-        };
-
-        const closeDeleteModal = () => closeModal('deleteModal');
-
-        const confirmDelete = (deleteBranch, nodeId) => {
-            const id = parseInt(nodeId);
-            const node = mindmapData.find(n => n.id === id);
-            if (!node) {
-                closeDeleteModal();
-                return showErrorModal('Der ausgewählte Knoten wurde nicht gefunden.');
-            }
-            if (node.level === 0) {
-                mindmapData = [];
-                nodeCounter = 0;
-                const newRootNode = { id: nodeCounter++, text: 'Hauptknoten', level: 0, parent: null, order: 0, branchIndex: 0, isCollapsed: false };
-                mindmapData.push(newRootNode);
-                if (mermaidInput) mermaidInput.value = 'mindmap|root(Hauptknoten)';
-                if (welcomeMessage) welcomeMessage.style.display = 'block'; // Show message after resetting mindmap
-            } else if (deleteBranch) {
-                deleteNodeAndChildren(id);
-                normalizeOrders();
-            } else {
-                const children = mindmapData.filter(n => n.parent === id);
-                const parentId = node.parent;
-                const parentChildrenCount = mindmapData.filter(n => n.parent === parentId && n.id !== id).length;
-                if (children.length + parentChildrenCount > MAX_CHILDREN_PER_NODE) {
-                    showErrorModal(`Der Elternknoten würde die maximale Anzahl von ${MAX_CHILDREN_PER_NODE} Unterknoten überschreiten.`);
-                    return closeDeleteModal();
-                }
-                children.forEach(child => {
-                    if (child.level > MAX_LEVEL) {
-                        showErrorModal(`Das Verschieben der Unterknoten würde die maximale Tiefe von ${MAX_LEVEL} Ebenen überschreiten.`);
-                        return closeDeleteModal();
-                    }
-                    child.parent = parentId;
-                    child.level = node.level;
-                    child.branchIndex = node.branchIndex;
-                });
-                mindmapData = mindmapData.filter(n => n.id !== id);
-                normalizeOrders();
-            }
-            renderEditor();
-            renderMindmap();
-            closeDeleteModal();
-        };
-
-        const deleteNodeAndChildren = id => {
-            mindmapData.filter(node => node.parent === id).forEach(child => deleteNodeAndChildren(child.id));
-            mindmapData = mindmapData.filter(node => node.id !== id);
-            if (welcomeMessage && !mindmapData.some(node => node.parent !== null)) {
-                welcomeMessage.style.display = 'block'; // Show message if no child nodes remain
-            }
-        };
-
-        const updateNodeText = (nodeId, newText, inputElement) => {
-            const node = mindmapData.find(n => n.id === nodeId);
-            if (!node || !validateNodeText(newText, inputElement)) {
-                inputElement.value = node.text;
-                return;
-            }
-            node.text = newText.trim();
-            renderMindmap();
-        };
-
-        // Drag-and-drop and touch handling
-        const getTargetElement = (x, y) => {
-            let target = document.elementFromPoint(x, y);
-            if (!target) {
-                const nodes = document.querySelectorAll('.node');
-                target = Array.from(nodes).find(node => {
-                    const rect = node.getBoundingClientRect();
-                    return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
-                });
-            }
-            return target;
-        };
-
-        const handleDragStart = e => {
-            if (e.type === 'touchstart' && e.touches.length > 1) return;
-            if (e.type === 'touchstart') e.preventDefault();
-            const node = e.target.closest('.node');
-            draggedNode = parseInt(node.dataset.nodeId);
-            node.classList.add('dragging');
-            document.querySelectorAll('.add-btn').forEach(btn => btn.style.boxShadow = '0 0 5px rgba(0, 0, 0, 0.3)');
-            if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
-        };
-
-        const handleDragOver = e => {
-            e.preventDefault();
-            e.dataTransfer.dropEffect = 'move';
-            document.querySelectorAll('.node').forEach(n => n.classList.remove('drag-over-child'));
-            const targetNode = e.target.closest('.node');
-            if (targetNode && parseInt(targetNode.dataset.nodeId) !== draggedNode) {
-                targetNode.classList.add('drag-over-child');
-            }
-        };
-
-        const handleDropZoneDragOver = e => {
-            e.preventDefault();
-            e.stopPropagation();
-            e.dataTransfer.dropEffect = 'move';
-            e.target.classList.add('drop-target');
-        };
-
-        const handleDropZoneDrop = (e, targetNodeId, dropType) => {
-            e.preventDefault();
-            e.stopPropagation();
-            if (draggedNode !== targetNodeId) moveNodeAdvanced(draggedNode, targetNodeId, dropType);
-            document.querySelectorAll('.drop-target').forEach(el => el.classList.remove('drop-target'));
-        };
-
-        const handleDrop = e => {
-            e.preventDefault();
-            const targetNodeId = parseInt(e.target.closest('.node').dataset.nodeId);
-            if (draggedNode !== targetNodeId) moveNodeAdvanced(draggedNode, targetNodeId, 'child');
-            document.querySelectorAll('.node').forEach(node => node.classList.remove('drag-over-child'));
-        };
-
-        const handleDragEnd = e => {
-            e.target.closest('.node').classList.remove('dragging');
-            draggedNode = null;
-            document.querySelectorAll('.node').forEach(node => node.classList.remove('drag-over-child'));
-            document.querySelectorAll('.add-btn').forEach(btn => {
-                btn.style.boxShadow = 'none';
-                btn.classList.remove('drop-target');
-            });
-        };
-
-        const handleTouchMove = e => {
-            if (!draggedNode || e.touches.length > 1) return;
-            e.preventDefault();
-            const touch = e.touches[0];
-            document.querySelectorAll('.node').forEach(n => n.classList.remove('drag-over-child'));
-            const targetNode = getTargetElement(touch.clientX, touch.clientY)?.closest('.node');
-            if (targetNode && parseInt(targetNode.dataset.nodeId) !== draggedNode) {
-                targetNode.classList.add('drag-over-child');
-            }
-        };
-
-        const handleTouchEnd = e => {
-            if (!draggedNode) return;
-            e.preventDefault();
-            const touch = e.changedTouches[0];
-            const targetElement = getTargetElement(touch.clientX, touch.clientY);
-            const targetNode = targetElement?.closest('.node');
-            const dropZone = targetElement?.closest('.add-btn');
-
-            if (dropZone && draggedNode !== parseInt(dropZone.dataset.nodeId)) {
-                moveNodeAdvanced(draggedNode, parseInt(dropZone.dataset.nodeId), 'child');
-            } else if (targetNode && draggedNode !== parseInt(targetNode.dataset.nodeId)) {
-                moveNodeAdvanced(draggedNode, parseInt(targetNode.dataset.nodeId), 'child');
-            }
-
-            document.querySelectorAll('.node').forEach(node => node.classList.remove('dragging', 'drag-over-child'));
-            document.querySelectorAll('.add-btn').forEach(btn => {
-                btn.style.boxShadow = 'none';
-                btn.classList.remove('drop-target');
-            });
-            draggedNode = null;
-        };
-
-        const moveNodeAdvanced = (nodeId, targetNodeId, dropType) => {
-            const nodeToMove = mindmapData.find(n => n.id === nodeId);
-            const targetNode = mindmapData.find(n => n.id === targetNodeId);
-            if (!nodeToMove || !targetNode) return;
-            if (isDescendant(nodeToMove.id, targetNode.id)) {
-                return showErrorModal('Ein Knoten kann nicht zu seinem eigenen Unterknoten verschoben werden!');
-            }
-            if (dropType === 'child') {
-                const childrenCount = mindmapData.filter(node => node.parent === targetNode.id && node.id !== nodeToMove.id).length;
-                if (childrenCount >= MAX_CHILDREN_PER_NODE) {
-                    return showErrorModal(`Der Zielknoten hat bereits die maximale Anzahl von ${MAX_CHILDREN_PER_NODE} Unterknoten erreicht.`);
-                }
-                const maxDepth = getMaxDepth(nodeToMove.id);
-                const newLevel = targetNode.level + 1;
-                if (newLevel + maxDepth > MAX_LEVEL) {
-                    return showErrorModal(`Das Verschieben würde die maximale Tiefe von ${MAX_LEVEL} Ebenen überschreiten.`);
-                }
-                nodeToMove.parent = targetNode.id;
-                nodeToMove.level = newLevel;
-                const siblings = mindmapData.filter(node => node.parent === targetNode.id && node.id !== nodeToMove.id)
-                    .sort((a, b) => (a.order || 0) - (b.order || 0));
-                nodeToMove.order = siblings.length > 0 ? Math.max(...siblings.map(s => s.order || 0)) + 1 : 0;
-                nodeToMove.branchIndex = targetNode.level === 0 ? siblings.length : targetNode.branchIndex;
-                nodeToMove.isCollapsed = newLevel === 1 ? false : undefined;
-                if (targetNode.level === 1) targetNode.isCollapsed = false;
-                if (targetNode.level === 0 && welcomeMessage) welcomeMessage.style.display = 'none'; // Hide message when adding child to root
-            }
-            const parentId = nodeToMove.parent;
-            const allSiblings = mindmapData.filter(node => node.parent === parentId)
-                .sort((a, b) => (a.order || 0) - (b.order || 0));
-            allSiblings.forEach((sibling, index) => {
-                sibling.branchIndex = parentId === null ? index : mindmapData.find(n => n.id === parentId).branchIndex;
-            });
-            updateChildrenLevels(nodeToMove.id, nodeToMove.level);
-            normalizeOrders();
-            renderEditor();
-            renderMindmap();
-        };
 
         // Help functions for node structure
         const getMaxDepth = nodeId => {
@@ -878,37 +593,7 @@
             });
         };
 
-        // Measure text width
-        const measureTextWidth = (text, fontSize = 14, fontFamily = 'Inter, system-ui, sans-serif') => {
-            const canvas = document.createElement('canvas');
-            const context = canvas.getContext('2d');
-            context.font = `${fontSize}px ${fontFamily}`;
-            return context.measureText(text).width;
-        };
 
-        // Split long words
-        const splitLongWord = (word, maxWidth, fontSize, fontFamily = 'Inter, system-ui, sans-serif') => {
-            const chars = word.split('');
-            const result = [];
-            let current = '';
-
-            for (let i = 0; i < chars.length; i++) {
-                const test = current + chars[i];
-                if (measureTextWidth(test, fontSize, fontFamily) <= maxWidth) {
-                    current += chars[i];
-                } else {
-                    if (current.length > 0) {
-                        result.push(current + (i < chars.length - 1 ? '-' : ''));
-                        current = chars[i];
-                    } else {
-                        result.push(chars[i] + (i < chars.length - 1 ? '-' : ''));
-                        current = '';
-                    }
-                }
-            }
-            if (current.length > 0) result.push(current);
-            return result;
-        };
 
         const countNodes = node => 1 + node.children.reduce((sum, child) => sum + countNodes(child), 0);
 
@@ -1031,6 +716,32 @@
             };
         };
 
+        // UPDATED: Build tree from data considering collapsed nodes
+        const buildTreeFromDataForSVG = () => {
+            const nodesMap = new Map(mindmapData.map(node => [node.id, { ...node, children: [] }]));
+            let root = null;
+
+            nodesMap.forEach(node => {
+                if (node.level === 0) root = node;
+                if (node.parent !== null) {
+                    const parent = nodesMap.get(node.parent);
+                    if (parent) {
+                        // Only add child if parent is not collapsed (for level 1 nodes)
+                        if (parent.level !== 1 || !parent.isCollapsed) {
+                            parent.children.push(node);
+                        }
+                    }
+                }
+            });
+
+            const sortChildren = node => {
+                node.children.sort((a, b) => (a.order || 0) - (b.order || 0));
+                node.children.forEach(sortChildren);
+            };
+            if (root) sortChildren(root);
+            return root;
+        };
+
         // Generate SVG
         const generateSVG = root => {
             if (!root) return '';
@@ -1060,7 +771,20 @@
                             ? { fillColor: BRANCH_COLORS[node.branchIndex % BRANCH_COLORS.length], fillOpacity: '0.6', strokeColor: BRANCH_COLORS[node.branchIndex % BRANCH_COLORS.length], strokeWidth: 2, strokeDasharray: '5,3' }
                             : { fillColor: '#ffffff', strokeColor: BRANCH_COLORS[node.branchIndex % BRANCH_COLORS.length], strokeWidth: 2, strokeDasharray: '5,3' };
                 const textColor = getContrastTextColor(fillColor);
-                svg += `<rect data-node-id="${node.id}" class="node-rect" x="${node.x}" y="${node.y}" width="${node.width}" height="${node.height}" rx="8" fill="${fillColor}" fill-opacity="${fillOpacity}" stroke="${strokeColor}" stroke-width="${strokeWidth}" stroke-dasharray="${strokeDasharray}"/>`;
+
+                // Add collapse indicator for level 1 nodes that have children
+                const originalNode = mindmapData.find(n => n.id === node.id);
+                const hasChildren = mindmapData.some(n => n.parent === node.id);
+                let collapseIndicator = '';
+                if (node.level === 1 && hasChildren) {
+                    const isCollapsed = originalNode && originalNode.isCollapsed;
+                    const indicatorX = node.x + node.width - 15;
+                    const indicatorY = node.y + 10;
+                    collapseIndicator = `<text x="${indicatorX}" y="${indicatorY}" font-size="12" font-family="FontAwesome" fill="${textColor}" text-anchor="middle">${isCollapsed ? '+' : ''}</text>`;
+                }
+
+                svg += `<rect data-node-id="${node.id}" class="node-rect" x="${node.x}" y="${node.y}" width="${node.width}" height="${node.height}" rx="8" fill="${fillColor}" fill-opacity="${fillOpacity || '1'}" stroke="${strokeColor}" stroke-width="${strokeWidth}" stroke-dasharray="${strokeDasharray}" style="cursor: ${node.level === 1 && hasChildren ? 'pointer' : 'default'}"/>`;
+
                 const words = node.text.split(' ').flatMap(word => {
                     const fontSize = Math.max(12, 18 - node.level);
                     if (measureTextWidth(word, fontSize) > 200) {
@@ -1086,8 +810,10 @@
                 const totalTextHeight = lines.length * lineHeight;
                 const startY = node.y + (node.height - totalTextHeight) / 2 + lineHeight * 0.7;
                 lines.forEach((textLine, index) => {
-                    svg += `<text data-node-id="${node.id}" class="node-text" x="${node.x + node.width / 2}" y="${startY + index * lineHeight}" font-size="${fontSize}" font-family="Inter, system-ui, sans-serif" fill="${textColor}" text-anchor="middle" font-weight="${node.level === 0 ? '600' : '400'}">${textLine}</text>`;
+                    svg += `<text data-node-id="${node.id}" class="node-text" x="${node.x + node.width / 2}" y="${startY + index * lineHeight}" font-size="${fontSize}" font-family="Inter, system-ui, sans-serif" fill="${textColor}" text-anchor="middle" font-weight="${node.level === 0 ? '600' : '400'}" style="cursor: ${node.level === 1 && hasChildren ? 'pointer' : 'default'}">${textLine}</text>`;
                 });
+
+                svg += collapseIndicator;
                 node.children.forEach(drawNodes);
             };
             drawConnections(root);
@@ -1095,6 +821,7 @@
             svg += '</svg>';
             return svg;
         };
+
         // Grenzen berechnen
         const getBounds = root => {
             let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
@@ -1109,14 +836,14 @@
             return { minX, minY, maxX, maxY };
         };
 
-        // Render mind maps
+        // UPDATED: Render mind maps with SVG collapse functionality
         const renderMindmap = () => {
             if (!mermaidInput) return;
             mermaidInput.value = generateMermaidCode();
             if (!previewContainer) return;
             previewContainer.innerHTML = '<div class="loading">Rendere Mindmap...</div>';
             try {
-                const root = buildTreeFromData();
+                const root = buildTreeFromDataForSVG(); // Use the new function
                 const svg = generateSVG(root);
                 previewContainer.innerHTML = `<div id="mermaid-container-${Date.now()}" class="mermaid-container">${svg}</div>`;
                 const existingOverlay = document.querySelector('.node-action-overlay, .input-overlay');
@@ -1136,34 +863,14 @@
                                 showErrorModal('Knoten nicht gefunden.');
                                 return;
                             }
-                            if (node.level === 0 && !hasInteractedWithRoot) {
-                                hasInteractedWithRoot = true;
-                                if (welcomeMessage) welcomeMessage.style.display = 'none'; // Hide message on root node click
-                            }
-                            if (node.level === 0 && e.target.classList.contains('delete-btn')) {
-                                showErrorModal('Der Hauptknoten kann nicht gelöscht werden.');
-                                return;
-                            }
-                            const rects = svgContainer.querySelectorAll(`rect[data-node-id="${nodeId}"]`);
-                            const texts = svgContainer.querySelectorAll(`text[data-node-id="${nodeId}"]`);
-                            [rects, texts].forEach(elements => {
-                                elements.forEach(el => {
-                                    el.classList.add('node-highlighted');
-                                    setTimeout(() => el.classList.remove('node-highlighted'), 500);
-                                });
-                            });
 
-                            const rect = target.getBoundingClientRect();
-                            const zoomFactor = currentZoom || 1;
-                            const overlay = document.createElement('div');
-                            overlay.className = 'node-action-overlay';
-                            overlay.style.left = `${rect.left + window.scrollX}px`;
-                            overlay.style.top = `${rect.bottom + window.scrollY + 5}px`;
-                            overlay.innerHTML = `
-                                <button class="edit-btn" title="Knoten bearbeiten"><i class="fa-solid fa-edit"></i></button>
-                                <button class="plus-btn" title="Neuer Unterknoten"><i class="fa-solid fa-plus"></i></button>
-                                <button class="delete-btn" title="Knoten löschen"><i class="fa-solid fa-trash"></i></button>
-                            `;
+                            // SPECIAL HANDLING: Level 1 nodes with children - toggle collapse on click
+                            if (node.level === 1 && mindmapData.some(n => n.parent === nodeId)) {
+                                toggleCollapse(nodeId);
+                                return; // Exit early, don't show the action overlay
+                            }
+
+
                             document.body.appendChild(overlay);
                             overlay.querySelector('.edit-btn').addEventListener('click', (e) => {
                                 e.stopPropagation();
@@ -1193,74 +900,10 @@
 
                                 let isSaving = false;
 
-                                input.addEventListener('input', () => {
-                                    validateInputLength(input, nodeId);
-                                });
 
-                                const saveInput = () => {
-                                    if (isSaving) return;
-                                    isSaving = true;
-                                    if (validateNodeText(input.value, input)) {
-                                        updateNodeText(nodeId, input.value, input);
-                                        renderEditor();
-                                    }
-                                    if (inputOverlay.isConnected) {
-                                        inputOverlay.remove();
-                                    }
-                                    document.removeEventListener('click', closeInputOverlay);
-                                    isSaving = false;
-                                };
 
-                                input.addEventListener('blur', saveInput);
-                                input.addEventListener('keydown', (e) => {
-                                    if (e.key === 'Enter' || e.keyCode === 13) {
-                                        e.preventDefault();
-                                        saveInput();
-                                    }
-                                });
+                            });
 
-                                const closeInputOverlay = (e) => {
-                                    if (!inputOverlay.contains(e.target)) {
-                                        saveInput();
-                                    }
-                                };
-                                document.addEventListener('click', closeInputOverlay);
-                            });
-                            overlay.querySelector('.plus-btn').addEventListener('click', (e) => {
-                                e.stopPropagation();
-                                if (!node || node.id !== nodeId) {
-                                    showErrorModal('Fehler: Ungültiger Knoten ausgewählt.');
-                                    overlay.remove();
-                                    return;
-                                }
-                                if (node.level >= MAX_LEVEL) {
-                                    showErrorModal(`Die maximale Tiefe von ${MAX_LEVEL} Ebenen wurde erreicht.`);
-                                    overlay.remove();
-                                    return;
-                                }
-                                const children = mindmapData.filter(n => n.parent === nodeId);
-                                if (children.length >= MAX_CHILDREN_PER_NODE) {
-                                    showErrorModal(`Der Elternknoten hat bereits die maximale Anzahl von ${MAX_CHILDREN_PER_NODE} Unterknoten erreicht.`);
-                                    overlay.remove();
-                                    return;
-                                }
-                                addChildNode(nodeId);
-                                overlay.remove();
-                                renderEditor();
-                                renderMindmap();
-                            });
-                            overlay.querySelector('.delete-btn').addEventListener('click', (e) => {
-                                e.stopPropagation();
-                                overlay.remove();
-                                showDeleteModal(nodeId);
-                            });
-                            const closeOverlay = (e) => {
-                                if (!overlay.contains(e.target) && !target.contains(e.target)) {
-                                    overlay.remove();
-                                    document.removeEventListener('click', closeOverlay);
-                                }
-                            };
-                            document.addEventListener('click', closeOverlay);
                         }
                     });
                 }

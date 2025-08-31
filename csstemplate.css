@@ -1,3 +1,13 @@
+h2 {
+border-left: 5px solid orange;
+  padding: 4px;
+  margin-bottom: 14px;
+  background: #f5f5f5;
+  border-radius: 5px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+  padding: 12px;
+}
+
 .action-menu .menubar {
     float: right;
 }
@@ -34,7 +44,7 @@
 }
 
 .mindmap-container svg {
-    height: auto;
+height: auto;
 }
 
 .root-text {
@@ -70,6 +80,7 @@
     border-radius: 8px;
     padding: 4px;
     border: 1px solid #e5e7eb;
+   margin-bottom: 26px;
 }
 
 .panel-title {
@@ -324,7 +335,6 @@
 }
 
 #mermaidPreview svg {
-    height: auto;
     transform-origin: 0 0;
     overflow: auto;
 }
@@ -436,7 +446,7 @@
 }
 
 .node-action-overlay {
-    position: absolute;
+    position: fixed;
     display: flex;
     gap: 15px;
     background: rgba(255, 255, 255, 0.9);
@@ -491,4 +501,21 @@
     border-radius: 4px;
     width: 100%;
     box-sizing: border-box;
+}
+
+
+#fullscreen_mindmap:fullscreen {
+  background: white !important; /* optional */
+}
+
+#fullscreen_mindmap:-webkit-full-screen{ /* Safari */
+    background: white !important;
+}
+
+#fullscreen_mindmap:-ms-fullscreen { /* IE11 */
+    background: white !important;
+}
+
+.fullscreen-mermaid {
+    height: 90vh !important;
 }

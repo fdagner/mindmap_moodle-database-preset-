@@ -1,10 +1,57 @@
 <style>
-.svg-container-list svg {
-width: 100%;
-}
+    .svg-container-list svg {
+        width: 100%;
+    }
 </style>
+<div class="main-content" id="fullscreen_mindmap">
+    <div id="combinedMindmapSection" class="mindmap">
+        <h2> <i class="fa-solid fa-sitemap" style="margin-left: 4px;"></i> Kombinierte Mindmap</h2>
+        <div class="combined-controls mindmap_buttons zoom-controls">
+            <button type="button" class="btn btn-light toggle-editor-btn hidden" onclick="toggleCombinedEditor()"
+                title="Listenmodus umschalten"><i class="fa-solid fa-list"></i></button>
+            <button type="button" class="btn btn-light hidden" onclick="zoomCombinedSvg(1.2)" title="Hineinzoomen">
+                <i class="fa-solid fa-magnifying-glass-plus"></i>
+            </button>
+            <button type="button" class="btn btn-light hidden" onclick="zoomCombinedSvg(1/1.2)" title="Herauszoomen">
+                <i class="fa-solid fa-magnifying-glass-minus"></i>
+            </button>
+            <button type="button" class="btn btn-light hidden" onclick="resetCombinedZoom()" title="Zoom zurücksetzen">
+                <i class="fa-solid fa-arrows-to-circle"></i>
+            </button>
+            <button type="button" class="btn btn-light hidden" onclick="toggleFullscreen()" title="Präsentationsmodus">
+                <i class="fa-solid fa-person-chalkboard"></i>
+            </button>
+            <button type="button" class="btn btn-light hidden" onclick="exportCombinedAsSVG()"
+                title="Als SVG exportieren">
+                <i class="fa-solid fa-file"></i>
+            </button>
+            <button type="button" class="btn btn-light hidden" onclick="copyCombinedMermaidCode()"
+                title="Mermaid-Code kopieren">
+                <i class="fa-solid fa-code"></i>
+            </button>
+        </div>
+
+        <div class="editor-panel" style="display: none;">
+
+            <div id="combinedMindmapEditor" class="mindmap-tree"></div>
+            <div class="export-area" style="display: none;">
+                <strong>Mermaid Code:</strong>
+                <textarea id="combinedMermaidText" class="form-control"></textarea>
+            </div>
+        </div>
+
+        <div class="preview-panel" id="combinedPreviewPanel">
+            <div id="combinedSvgContainer" class="svg-container svg-container-list">
+                <div id="combinedWelcomeMessage" class="loading"> <button type="button" class="btn btn-secondary"
+                        onclick="showCombinedControls()" title="Kombinierte Mindmap erstellen">
+                        Kombinierte Mindmap erzeugen
+                    </button></div>
+                <div id="svgZoomContainer"></div>
+            </div>
+        </div>
+
+
+    </div>
+</div>
 <div id="mindmaps">
-
-   
-
-
+    <h2><i class="fa-solid fa-list" style="margin-left: 4px;"></i> Einzelne Mindmaps</h2>

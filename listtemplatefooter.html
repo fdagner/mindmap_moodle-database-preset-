@@ -1,31 +1,48 @@
 </div>
 
+<div id="deleteModal" class="mindmap-modal">
+    <div class="mindmap-modal-content">
+        <h3>Knoten löschen</h3>
+        <p id="deleteModalMessage"></p>
+        <div class="mindmap-modal-buttons" id="deleteModalButtons"></div>
+    </div>
+</div>
+
+<div id="errorModal" class="mindmap-modal">
+    <div class="mindmap-modal-content">
+        <h3>Fehler</h3>
+        <p id="errorModalMessage"></p>
+        <div class="mindmap-modal-buttons">
+            <button type="button" class="btn btn-primary" onclick="closeErrorModal()">OK</button>
+        </div>
+    </div>
+</div>
+
+<div id="successModal" class="mindmap-modal">
+    <div class="mindmap-modal-content">
+        <h3>Erfolg</h3>
+        <p id="successModalMessage"></p>
+        <div class="mindmap-modal-buttons">
+            <button type="button" class="btn btn-primary" onclick="closeSuccessModal()">OK</button>
+        </div>
+    </div>
+</div>
+
+<div id="warningModal" class="mindmap-modal">
+    <div class="mindmap-modal-content">
+        <h3>Warnung</h3>
+        <p id="warningModalMessage"></p>
+        <div class="mindmap-modal-buttons">
+            <button type="button" class="btn btn-primary" onclick="closeWarningModal()">OK</button>
+        </div>
+    </div>
+</div>
 
 <script>
+    let combinedData = [];
+    let combinedNodeCounter = 0;
 
-    // Function for calculating the relative luminance of a color
-    function calculateLuminance(hex) {
-        const rgb = hexToRgb(hex);
-        const [r, g, b] = rgb.map(c => {
-            c = c / 255;
-            return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
-        });
-        return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-    }
 
-    // Converts hex color to RGB
-    function hexToRgb(hex) {
-        hex = hex.replace(/^#/, '');
-        if (hex.length === 3) hex = hex.split('').map(c => c + c).join('');
-        const bigint = parseInt(hex, 16);
-        return [(bigint >> 16) & 255, (bigint >> 8) & 255, bigint & 255];
-    }
-
-    // Selects text color based on background color
-    function getContrastTextColor(bgColor) {
-        const luminance = calculateLuminance(bgColor);
-        return luminance > 0.5 ? '#000000' : '#ffffff';
-    }
 
     // Node validation
     const validateNodeText = (text) => {
@@ -135,16 +152,20 @@
     };
 
     // Create tree structure from data
-    const buildTreeFromData = (mindmapData) => {
-        const nodesMap = new Map(mindmapData.map(node => [node.id, { ...node, children: [] }]));
+    const buildTreeFromData = (data) => {
+        const nodesMap = new Map(data.map(node => [node.id, { ...node, children: [] }]));
         let root = null;
+
         nodesMap.forEach(node => {
             if (node.level === 0) root = node;
             if (node.parent !== null) {
                 const parent = nodesMap.get(node.parent);
-                if (parent) parent.children.push(node);
+                if (parent && (parent.level !== 1 || !parent.isCollapsed)) {
+                    parent.children.push(node);
+                }
             }
         });
+
         const sortChildren = node => {
             node.children.sort((a, b) => (a.order || 0) - (b.order || 0));
             node.children.forEach(sortChildren);
@@ -168,37 +189,8 @@
         });
     };
 
-    // Measure text width
-    const measureTextWidth = (text, fontSize = 14, fontFamily = 'Inter, system-ui, sans-serif') => {
-        const canvas = document.createElement('canvas');
-        const context = canvas.getContext('2d');
-        context.font = `${fontSize}px ${fontFamily}`;
-        return context.measureText(text).width;
-    };
 
-    // Lange Wörter aufteilen
-    const splitLongWord = (word, maxWidth, fontSize, fontFamily = 'Inter, system-ui, sans-serif') => {
-        const chars = word.split('');
-        const result = [];
-        let current = '';
 
-        for (let i = 0; i < chars.length; i++) {
-            const test = current + chars[i];
-            if (measureTextWidth(test, fontSize, fontFamily) <= maxWidth) {
-                current += chars[i];
-            } else {
-                if (current.length > 0) {
-                    result.push(current + (i < chars.length - 1 ? '-' : ''));
-                    current = chars[i];
-                } else {
-                    result.push(chars[i] + (i < chars.length - 1 ? '-' : ''));
-                    current = '';
-                }
-            }
-        }
-        if (current.length > 0) result.push(current);
-        return result;
-    };
 
     // Calculate sub-tree size
     const calculateSubtreeSize = (node) => {
@@ -327,7 +319,7 @@
         const { minX, minY, maxX, maxY } = getBounds(root);
         const width = maxX - minX + padding * 2;
         const height = maxY - minY + padding * 2;
-        let svg = `<svg width="${width}" height="${height}" viewBox="${minX - padding} ${minY - padding} ${width} ${height}" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">`;
+        let svg = `<svg width="${width}" height="${height}" style="height: auto" viewBox="${minX - padding} ${minY - padding} ${width} ${height}" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">`;
         const drawConnections = node => {
             node.children.forEach(child => {
                 const { fromX, fromY, toX, toY } = getConnectionPoint(node, child);
@@ -343,7 +335,20 @@
                     : node.level === 2
                         ? { fillColor: branchColors.colors[node.branchIndex % branchColors.colors.length], fillOpacity: '0.6', strokeColor: branchColors.colors[node.branchIndex % branchColors.colors.length], textColor: node.textColor, strokeWidth: 2, strokeDasharray: '5,3' }
                         : { fillColor: '#ffffff', strokeColor: branchColors.colors[node.branchIndex % branchColors.colors.length], textColor: node.textColor, strokeWidth: 2, strokeDasharray: '5,3' };
-            svg += `<rect data-node-id="${node.id}" class="node-rect" x="${node.x}" y="${node.y}" width="${node.width}" height="${node.height}" rx="8" fill="${fillColor}" fill-opacity="${fillOpacity}" stroke="${strokeColor}" stroke-width="${strokeWidth}" stroke-dasharray="${strokeDasharray}"/>`;
+
+            // Kollaps-Indikator für Level-1-Knoten mit Kindern
+            const originalNode = combinedData.find(n => n.id === node.id);
+            const hasChildren = combinedData.some(n => n.parent === node.id);
+            let collapseIndicator = '';
+            if (node.level === 1 && hasChildren) {
+                const isCollapsed = originalNode && originalNode.isCollapsed;
+                const indicatorX = node.x + node.width - 15;
+                const indicatorY = node.y + 10;
+                collapseIndicator = `<text x="${indicatorX}" y="${indicatorY}" font-size="12" font-family="FontAwesome" fill="${textColor}" text-anchor="middle">${isCollapsed ? '+' : ''}</text>`;
+            }
+
+            svg += `<rect data-node-id="${node.id}" class="node-rect" x="${node.x}" y="${node.y}" width="${node.width}" height="${node.height}" rx="8" fill="${fillColor}" fill-opacity="${fillOpacity || '1'}" stroke="${strokeColor}" stroke-width="${strokeWidth}" stroke-dasharray="${strokeDasharray}" style="cursor: ${node.level === 1 && hasChildren ? 'pointer' : 'default'}"/>`;
+
             const words = node.text.split(' ').flatMap(word => {
                 const fontSize = Math.max(12, 18 - node.level);
                 if (measureTextWidth(word, fontSize) > 200) {
@@ -369,8 +374,10 @@
             const totalTextHeight = lines.length * lineHeight;
             const startY = node.y + (node.height - totalTextHeight) / 2 + lineHeight * 0.7;
             lines.forEach((textLine, index) => {
-                svg += `<text data-node-id="${node.id}" class="node-text" x="${node.x + node.width / 2}" y="${startY + index * lineHeight}" font-size="${fontSize}" font-family="Inter, system-ui, sans-serif" fill="${textColor}" text-anchor="middle" font-weight="${node.level === 0 ? '600' : '400'}">${textLine}</text>`;
+                svg += `<text data-node-id="${node.id}" class="node-text" x="${node.x + node.width / 2}" y="${startY + index * lineHeight}" font-size="${fontSize}" font-family="Inter, system-ui, sans-serif" fill="${textColor}" text-anchor="middle" font-weight="${node.level === 0 ? '600' : '400'}" style="cursor: ${node.level === 1 && hasChildren ? 'pointer' : 'default'}">${textLine}</text>`;
             });
+
+            svg += collapseIndicator;
             node.children.forEach(drawNodes);
         };
         drawConnections(root);
@@ -378,7 +385,6 @@
         svg += '</svg>';
         return svg;
     };
-
     // Grenzen berechnen
     const getBounds = root => {
         let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
@@ -420,14 +426,14 @@
                     rootTextElement.innerHTML = `<h3 class="root-text">${rootTextValue}</h3>`;
                 }
                 svgContainer.innerHTML = `
-                    <div class="mindmap-container">${svg}</div>`;
+                    <div class="mindmap-container" style="height: auto">${svg}</div>`;
             } catch (error) {
                 const mermaidCode = input.value.split('|').map(line => {
                     const match = line.match(/^(~*)[^~]*/);
                     return match ? '  '.repeat(match[1]?.length || 0) + match[0].replace(/^~*/, '') : line;
                 }).join('\n');
                 svgContainer.innerHTML = `
-                    <div class="mindmap-container">
+                    <div class="mindmap-container"
                         <div style="background: #f1f3f4; padding: 20px; border-radius: 12px; border-left: 4px solid #dc2626;">
                             <h4 style="margin: 0 0 10px 0; color: #dc2626;">⚠️ Vorschau nicht verfügbar</h4>
                             <p style="color: #6b7280; margin: 0 0 15px 0; font-size: 14px;">Rendering-Fehler: ${error.message}</p>
@@ -442,6 +448,721 @@
 
     // Initialization
     document.addEventListener('DOMContentLoaded', () => {
-        renderMindmaps();
+        combinedWelcomeMessage = document.getElementById('combinedWelcomeMessage');
+        const editor = document.getElementById('combinedMindmapEditor');
+        if (editor) {
+            renderMindmaps();
+            renderCombinedEditor();
+        } else {
+            console.warn('combinedMindmapEditor not found, skipping renderCombinedEditor');
+        }
+        const colorThemeSelect = document.getElementById('color-theme');
+        if (colorThemeSelect) {
+            colorThemeSelect.addEventListener('change', () => {
+                renderCombinedEditor();
+                generateCombinedMindmap();
+            });
+        }
+
     });
+</script>
+
+
+
+<script>
+    function showCombinedControls() {
+        const combinedSection = document.getElementById('combinedMindmapSection');
+        if (!combinedSection) {
+            showErrorModal('Fehler: Kombinierter Mindmap-Bereich nicht gefunden.');
+            console.error('Combined mindmap section (#combinedMindmapSection) not found.');
+            return;
+        }
+        const editorPanel = document.querySelector('.editor-panel');
+        const previewPanel = document.querySelector('.preview-panel');
+        const welcomeMessage = document.getElementById('combinedWelcomeMessage');
+        if (!editorPanel || !previewPanel || !welcomeMessage) {
+            showErrorModal('Fehler: Editor-, Vorschau- oder Willkommens-Elemente nicht gefunden.');
+            console.log('showCombinedControls - Elements:', {
+                combinedSection: !!combinedSection,
+                editorPanel: !!editorPanel,
+                editorPanelId: editorPanel?.id,
+                previewPanel: !!previewPanel,
+                previewPanelId: previewPanel?.id,
+                welcomeMessage: !!welcomeMessage
+            });
+            console.error('Missing elements:', {
+                editorPanel: !!editorPanel,
+                previewPanel: !!previewPanel,
+                welcomeMessage: !!welcomeMessage
+            });
+            return;
+        }
+
+        // Alle Buttons im Container holen
+        const buttons = document.querySelectorAll("#combinedMindmapSection .mindmap_buttons button");
+        buttons.forEach((btn, index) => {
+            if (index >= 0) {
+                btn.classList.remove("hidden");
+            } else {
+                btn.classList.add("hidden");
+            }
+        });
+
+        // Mindmap rendern
+        generateCombinedMindmap();
+        // renderCombinedEditor(); // Kommentiert, um zunächst nur die SVG zu testen
+    }
+    // Funktion zur Erstellung einer kombinierten Mindmap aus allen vorhandenen Mindmaps
+
+    const generateCombinedMindmap = () => {
+        const combinedContainer = document.getElementById('combinedSvgContainer');
+        if (!combinedContainer) {
+            console.error('combinedSvgContainer not found');
+            return;
+        }
+
+        combinedContainer.innerHTML = '<div class="loading">Erstelle kombinierte Mindmap...</div>';
+
+        try {
+            const inputElements = document.querySelectorAll('.export-input');
+            const colorElements = document.querySelectorAll('[id^="color-"]');
+
+            if (inputElements.length === 0) {
+                combinedContainer.innerHTML = '<div class="error">Keine Mindmaps gefunden.</div>';
+                return;
+            }
+
+            if (!combinedData || combinedData.length === 0) {
+                console.log('Initialisiere combinedData');
+                combinedData = [];
+                combinedNodeCounter = 0;
+
+                const mainRoot = {
+                    id: combinedNodeCounter++,
+                    text: '💡',
+                    level: 0,
+                    parent: null,
+                    order: 0,
+                    branchIndex: 0,
+                    originalScheme: 'Standard',
+                    isCollapsed: false
+                };
+                combinedData.push(mainRoot);
+
+                inputElements.forEach((input, index) => {
+                    const inputId = input.id;
+                    const colorElement = document.getElementById(`color-${inputId}`);
+                    let selectedScheme = 'Standard';
+
+                    if (colorElement && colorElement.innerText.trim() && BRANCH_COLORS_SCHEMES[colorElement.innerText.trim()]) {
+                        selectedScheme = colorElement.innerText.trim();
+                    }
+
+                    const individualData = initializeFromMermaidCode(input.value);
+
+                    if (individualData.length > 0) {
+                        const originalRoot = individualData.find(node => node.level === 0);
+
+                        if (originalRoot) {
+                            const newBranchRoot = {
+                                id: combinedNodeCounter++,
+                                text: originalRoot.text,
+                                level: 1,
+                                parent: mainRoot.id,
+                                order: index,
+                                branchIndex: index,
+                                originalScheme: selectedScheme,
+                                isCollapsed: false
+                            };
+                            combinedData.push(newBranchRoot);
+
+                            const addChildren = (originalParentId, newParentId, levelOffset) => {
+                                const children = individualData.filter(node => node.parent === originalParentId)
+                                    .sort((a, b) => (a.order || 0) - (b.order || 0));
+
+                                children.forEach((child, childIndex) => {
+                                    // Bestimme den branchIndex für Level-2 und höher
+                                    const parentNode = combinedData.find(n => n.id === newParentId);
+                                    const newBranchIndex = child.level === 1 ? childIndex : parentNode.branchIndex;
+
+                                    const newChild = {
+                                        id: combinedNodeCounter++,
+                                        text: child.text,
+                                        level: child.level + levelOffset,
+                                        parent: newParentId,
+                                        order: child.order,
+                                        branchIndex: newBranchIndex,
+                                        originalScheme: selectedScheme,
+                                        isCollapsed: child.level + levelOffset === 1 ? false : undefined
+                                    };
+
+                                    if (newChild.level <= MAX_LEVEL) {
+                                        combinedData.push(newChild);
+                                        addChildren(child.id, newChild.id, levelOffset);
+                                    }
+                                });
+                            };
+
+                            addChildren(originalRoot.id, newBranchRoot.id, 1);
+                        }
+                    }
+                });
+                console.log('combinedData nach Initialisierung:', combinedData);
+            }
+
+            const combinedRoot = buildTreeFromData(combinedData);
+            const combinedColorScheme = BRANCH_COLORS_SCHEMES['Standard'];
+            const svg = generateSVGWithIndividualSchemes(combinedRoot, combinedColorScheme);
+
+            combinedContainer.innerHTML = `
+            <div class="mindmap-container" id="svgZoomContainer">
+                ${svg}
+            </div>
+        `;
+
+            const svgContainer = combinedContainer.querySelector('svg');
+            if (svgContainer) {
+                // Entferne bestehende Event-Listener, um Doppelbindungen zu vermeiden
+                const newSvgContainer = svgContainer.cloneNode(true);
+                svgContainer.parentNode.replaceChild(newSvgContainer, svgContainer);
+
+                newSvgContainer.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const target = e.target.closest('[data-node-id]');
+                    if (target) {
+                        const nodeId = parseInt(target.getAttribute('data-node-id'));
+                        const node = combinedData.find(n => n.id === nodeId);
+                        if (!node) {
+                            showErrorModal('Knoten nicht gefunden.');
+                            console.error('Knoten nicht gefunden:', nodeId);
+                            return;
+                        }
+
+                        if (node.level === 1 && combinedData.some(n => n.parent === nodeId)) {
+                            const originalNode = combinedData.find(n => n.id === nodeId);
+                            if (originalNode) {
+                                console.log('Vor Toggle: isCollapsed =', originalNode.isCollapsed, 'Node:', originalNode);
+                                originalNode.isCollapsed = !originalNode.isCollapsed;
+                                console.log('Nach Toggle: isCollapsed =', originalNode.isCollapsed, 'Node:', originalNode);
+                                generateCombinedMindmap(); // SVG neu rendern
+                            }
+                            return;
+                        }
+                    }
+                });
+            }
+
+            const welcomeMessage = document.getElementById('combinedWelcomeMessage');
+            if (welcomeMessage && !hasInteractedWithRoot && !combinedData.some(node => node.parent !== null)) {
+                welcomeMessage.style.display = 'block';
+            } else if (welcomeMessage) {
+                welcomeMessage.style.display = 'none';
+            }
+        } catch (error) {
+            console.error('Fehler beim Rendern der kombinierten Mindmap:', error);
+            const mermaidCode = generateCombinedMermaidCode().split('|').map(line => {
+                const match = line.match(/^(~*)[^~]*/);
+                return match ? '  '.repeat(match[1]?.length || 0) + match[0].replace(/^~*/, '') : line;
+            }).join('\n');
+            combinedContainer.innerHTML = `
+            <div class="error">
+                <div style="background: #f1f3f4; padding: 20px; border-radius: 12px; border-left: 4px solid #dc2626;">
+                    <h4 style="margin: 0 0 10px 0; color: #dc2626;">⚠️ Vorschau nicht verfügbar</h4>
+                    <p style="color: #6b7280; margin: 0 0 15px 0; font-size: 14px;">Rendering-Fehler: ${error.message}</p>
+                    <h5 style="margin: 15px 0 10px 0; color: #1f2937;">📋 Generierter Code:</h5>
+                    <pre style="background: white; padding: 15px; border-radius: 8px; font-family: 'Courier New', monospace; font-size: 13px; line-height: 1.4; overflow-x: auto; margin: 0; border: 1px solid #e5e7eb;">${mermaidCode}</pre>
+                </div>
+            </div>
+        `;
+            if (welcomeMessage) welcomeMessage.style.display = 'none';
+        }
+    };
+
+    // Zoom-Funktionen für die kombinierte Mindmap
+    const zoomCombinedSvg = (factor) => {
+        const container = document.getElementById('combinedSvgContainer');
+        if (!container) return;
+
+        currentZoom *= factor;
+        const svgContainer = container.querySelector('.mindmap-container');
+        if (svgContainer) {
+            svgContainer.style.transformOrigin = '0 0';
+            svgContainer.style.transform = `scale(${currentZoom})`;
+            container.style.overflow = 'auto';
+        }
+    };
+
+    const resetCombinedZoom = () => {
+        const container = document.getElementById('combinedSvgContainer');
+        if (!container) return;
+
+        currentZoom = 1;
+        const svgContainer = container.querySelector('.mindmap-container');
+        if (svgContainer) {
+            svgContainer.style.transform = 'none';
+        }
+        container.style.overflow = 'auto';
+    };
+
+    // Export-Funktion für die kombinierte Mindmap
+    const exportCombinedAsSVG = () => {
+        const container = document.getElementById('combinedSvgContainer');
+        if (!container) return;
+
+        const svgElement = container.querySelector('svg');
+        if (!svgElement) {
+            showErrorModal('Keine kombinierte Mindmap verfügbar. Bitte erstellen Sie zuerst eine kombinierte Mindmap.');
+            return;
+        }
+
+        const svgData = new XMLSerializer().serializeToString(svgElement.cloneNode(true));
+        const svgBlob = new Blob(['<?xml version="1.0" standalone="no"?>\n' + svgData], { type: 'image/svg+xml' });
+        const url = URL.createObjectURL(svgBlob);
+        const downloadLink = document.createElement('a');
+        downloadLink.href = url;
+        downloadLink.download = 'combined-mindmap.svg';
+        document.body.appendChild(downloadLink);
+        downloadLink.click();
+        document.body.removeChild(downloadLink);
+        URL.revokeObjectURL(url);
+        showSuccessModal('Kombinierte Mindmap wurde als SVG exportiert!');
+    };
+
+    // Mermaid-Code für die kombinierte Mindmap generieren
+    const generateCombinedMermaidCode = () => {
+        if (!combinedData.length) return 'mindmap|root(Alle Mindmaps)';
+        const rootNode = combinedData.find(node => node.level === 0);
+        if (!rootNode) return 'mindmap|root(Alle Mindmaps)';
+        const addNodeToMermaid = (node, level = 0) => {
+            const indent = '~'.repeat(level);
+            const text = node.text.replace(/[]/g, '');
+            let nodeCode = node.level === 0 ? `${indent}root(${text})` : `${indent}${text}`;
+            const children = combinedData.filter(child => child.parent === node.id).sort((a, b) => (a.order || 0) - (b.order || 0));
+            return nodeCode + children.map(child => '|' + addNodeToMermaid(child, level + 1)).join('');
+        };
+        return 'mindmap|' + addNodeToMermaid(rootNode);
+    };
+
+
+    // Kopiere Mermaid-Code der kombinierten Mindmap
+    const copyCombinedMermaidCode = () => {
+        const mermaidCode = generateCombinedMermaidCode();
+        const formattedCode = mermaidCode.split('|').map(line => {
+            const match = line.match(/^(~*)[^~]*/);
+            return match ? '  '.repeat(match[1]?.length || 0) + match[0].replace(/^~*/, '') : line;
+        }).join('\n');
+
+        const textarea = document.createElement('textarea');
+        textarea.value = formattedCode;
+        document.body.appendChild(textarea);
+        textarea.select();
+
+        try {
+            document.execCommand('copy');
+            showSuccessModal('Mermaid-Code der kombinierten Mindmap wurde in die Zwischenablage kopiert!');
+        } catch (err) {
+            showErrorModal('Fehler beim Kopieren des Codes in die Zwischenablage.');
+        }
+
+        document.body.removeChild(textarea);
+    };
+
+    // Toggle Editor für kombinierte Mindmap
+    const toggleCombinedEditor = () => {
+        const combinedSection = document.getElementById('combinedMindmapSection');
+        if (!combinedSection) {
+            showErrorModal('Fehler: Kombinierter Mindmap-Bereich nicht gefunden.');
+            console.error('Combined mindmap section (#combinedMindmapSection) not found.');
+            return;
+        }
+
+        const editorPanel = document.querySelector('#combinedMindmapSection .editor-panel');
+        const previewPanel = document.querySelector('#combinedMindmapSection .preview-panel');
+        const toggleButton = document.querySelector('#combinedMindmapSection .toggle-editor-btn');
+        const zoomButtons = document.querySelectorAll('#combinedMindmapSection .combined-controls .btn.btn-light:not(.toggle-editor-btn)');
+
+
+        if (!editorPanel || !previewPanel || !toggleButton) {
+            showErrorModal('Fehler: Mindmap-Editor- oder Vorschau-Elemente nicht gefunden.');
+            console.error('Missing elements:', {
+                editorPanel: !!editorPanel,
+                previewPanel: !!previewPanel,
+                toggleButton: !!toggleButton
+            });
+            return;
+        }
+
+        if (!combinedData.length || !combinedData.some(node => node.level === 0)) {
+            showErrorModal('Fehler: Kombinierte Mindmap wurde noch nicht erstellt.');
+            return;
+        }
+
+        // Verwende getComputedStyle, um den tatsächlichen Display-Wert zu prüfen
+        const isEditorHidden = window.getComputedStyle(editorPanel).display === 'none';
+
+        if (isEditorHidden) {
+            editorPanel.style.display = 'block';
+            previewPanel.style.display = 'none';
+            toggleButton.innerHTML = '<i class="fa-solid fa-lightbulb"></i>';
+            zoomButtons.forEach(button => button.style.display = 'none');
+            if (combinedWelcomeMessage && !hasInteractedWithRoot && !combinedData.some(node => node.parent !== null)) {
+                combinedWelcomeMessage.style.display = 'block';
+            }
+        } else {
+            editorPanel.style.display = 'none';
+            previewPanel.style.display = 'block';
+            toggleButton.innerHTML = '<i class="fa-solid fa-list"></i>';
+            zoomButtons.forEach(button => button.style.display = 'inline-block');
+            if (combinedWelcomeMessage && !hasInteractedWithRoot && !combinedData.some(node => node.parent !== null)) {
+                combinedWelcomeMessage.style.display = 'block';
+            } else if (combinedWelcomeMessage) {
+                combinedWelcomeMessage.style.display = 'none';
+            }
+        }
+
+        renderCombinedEditor();
+
+    };
+
+    // Render Editor für kombinierte Mindmap
+    const renderCombinedEditor = () => {
+
+        const editor = document.getElementById('combinedMindmapEditor');
+        if (!editor) return;
+        editor.innerHTML = '';
+        const sortedNodes = getSortedNodes(combinedData);
+
+        sortedNodes.forEach((node, index) => {
+            const nodeDiv = document.createElement('div');
+            nodeDiv.className = 'node';
+            nodeDiv.dataset.nodeId = node.id;
+            nodeDiv.dataset.index = index;
+            nodeDiv.dataset.level = node.level;
+            nodeDiv.draggable = false;
+
+            const parent = node.level > 0 ? combinedData.find(n => n.id === node.parent) : null;
+            node.branchIndex = node.level === 0 ? 0 :
+                node.level === 1 ? combinedData.filter(n => n.parent === node.parent).sort((a, b) => (a.order || 0) - (b.order || 0)).indexOf(node) :
+                    parent ? parent.branchIndex : 0;
+
+            const collapseIcon = node.level === 1 ? `<span class="collapse-icon" onclick="toggleCollapse(${node.id}, combinedData, renderCombinedEditor)" title="${node.isCollapsed ? 'Ast ausklappen' : 'Ast einklappen'}">${node.isCollapsed ? '<i class="fa-solid fa-chevron-right"></i>' : '<i class="fa-solid fa-chevron-down"></i>'}</span>` : '';
+
+            const indent = node.level > 1 ? `<span class="indent">${'　'.repeat(node.level * 2)}</span>` : '';
+
+            const colorThemeSelect = document.getElementById('[[color_theme#id]]');
+            let selectedScheme = node.originalScheme || colorThemeSelect?.options[colorThemeSelect.selectedIndex]?.value || 'Standard';
+            const inputBackgroundColor = node.level === 0 ? BRANCH_COLORS_SCHEMES[selectedScheme].level0 :
+                node.level === 1 ? BRANCH_COLORS_SCHEMES[selectedScheme].colors[node.branchIndex % BRANCH_COLORS_SCHEMES[selectedScheme].colors.length] :
+                    node.level === 2 ? BRANCH_COLORS_SCHEMES[selectedScheme].colors[node.branchIndex % BRANCH_COLORS_SCHEMES[selectedScheme].colors.length] :
+                        '#ffffff';
+            const textColor = getContrastTextColor(inputBackgroundColor);
+
+            nodeDiv.innerHTML = `
+      ${indent}
+      ${collapseIcon}
+      <input type="text" class="node-input" value="${node.text}" 
+             style="background-color: ${inputBackgroundColor}; color: ${textColor};"
+             oninput="validateInputLength(this, ${node.id})"
+             onchange="updateNodeText(${node.id}, this.value, this, combinedData, renderCombinedEditor, generateCombinedMindmap)"
+             placeholder="Knotenbeschriftung eingeben" 
+             draggable="false" 
+             data-node-id="${node.id}">
+    `;
+
+
+            const inputElement = nodeDiv.querySelector('.node-input');
+            const collapseIconElement = nodeDiv.querySelector('.collapse-icon');
+
+
+            inputElement.addEventListener('mousedown', e => {
+                e.stopPropagation();
+                isDragging = false;
+                const input = e.target;
+                const rect = input.getBoundingClientRect();
+                const clickX = e.clientX - rect.left;
+                const ctx = document.createElement('canvas').getContext('2d');
+                ctx.font = window.getComputedStyle(input).fontSize + ' ' + window.getComputedStyle(input).fontFamily;
+                const text = input.value;
+                let bestPosition = 0;
+                for (let i = 0; i <= text.length; i++) {
+                    if (ctx.measureText(text.substring(0, i)).width + 10 >= clickX) {
+                        bestPosition = i;
+                        break;
+                    }
+                    bestPosition = i;
+                }
+                setTimeout(() => !isDragging && input.setSelectionRange(bestPosition, bestPosition), 0);
+            });
+
+            inputElement.addEventListener('click', e => {
+                e.stopPropagation();
+                if (isDragging) return e.preventDefault();
+                const input = e.target;
+                setTimeout(() => {
+                    const rect = input.getBoundingClientRect();
+                    if ((e.clientX - rect.left) > (rect.width - 20) * 0.9) {
+                        input.setSelectionRange(input.value.length, input.value.length);
+                    }
+                }, 10);
+            });
+
+            inputElement.addEventListener('keydown', e => (e.key === 'Enter' || e.keyCode === 13) && e.preventDefault() && e.target.blur());
+
+            editor.appendChild(nodeDiv);
+        });
+    };
+
+
+
+    const deleteNodeAndChildren = (id, data) => {
+        data.filter(node => node.parent === id).forEach(child => deleteNodeAndChildren(child.id, data));
+        data.splice(data.findIndex(node => node.id === id), 1);
+    };
+
+    const updateNodeText = (nodeId, newText, inputElement, data, renderEditor, renderMindmap) => {
+        const node = data.find(n => n.id === nodeId);
+        if (!node || !validateNodeText(newText, inputElement)) {
+            inputElement.value = node.text;
+            return;
+        }
+        node.text = newText.trim();
+        renderEditor();
+        renderMindmap();
+    };
+
+
+    // Hilfsfunktionen
+    const getSortedNodes = (data) => {
+        const nodes = [];
+        const rootNodes = data.filter(node => node.level === 0).sort((a, b) => a.order - b.order);
+        const addNodeAndChildren = node => {
+            if (!isNodeVisible(node, data)) return;
+            nodes.push(node);
+            if (node.level === 1 && node.isCollapsed) return;
+            data.filter(child => child.parent === node.id)
+                .sort((a, b) => (a.order || 0) - (b.order || 0))
+                .forEach(addNodeAndChildren);
+        };
+        rootNodes.forEach(addNodeAndChildren);
+        return nodes;
+    };
+
+    const isNodeVisible = (node, data) => {
+        if (node.level === 0) return true;
+        const parent = data.find(n => n.id === node.parent);
+        if (!parent) return false;
+        if (parent.level === 1 && parent.isCollapsed) return false;
+        return isNodeVisible(parent, data);
+    };
+
+    const toggleCollapse = (nodeId, data, renderEditor) => {
+        const node = data.find(n => n.id === nodeId);
+        if (!node || node.level !== 1) return;
+        node.isCollapsed = !node.isCollapsed;
+        renderEditor();
+        generateCombinedMindmap();
+    };
+
+    const getMaxDepth = (nodeId, data) => {
+        const node = data.find(n => n.id === nodeId);
+        if (!node) return 0;
+        const children = data.filter(n => n.parent === nodeId);
+        return children.length ? Math.max(...children.map(child => 1 + getMaxDepth(child.id, data))) : 0;
+    };
+
+    const isDescendant = (ancestorId, nodeId, data) => {
+        const node = data.find(n => n.id === nodeId);
+        if (!node || node.parent === null) return false;
+        return node.parent === ancestorId || isDescendant(ancestorId, node.parent, data);
+    };
+
+    const updateChildrenLevels = (nodeId, newLevel, data) => {
+        data.filter(n => n.parent === nodeId).forEach(child => {
+            child.level = newLevel + 1;
+            child.branchIndex = data.find(n => n.id === nodeId).branchIndex;
+            child.isCollapsed = child.level === 1 ? false : undefined;
+            updateChildrenLevels(child.id, child.level, data);
+        });
+    };
+
+    const normalizeOrders = (data) => {
+        const groups = {};
+        data.forEach(node => {
+            const key = node.parent === null ? 'root' : node.parent;
+            groups[key] = groups[key] || [];
+            groups[key].push(node);
+        });
+        Object.values(groups).forEach(group => {
+            group.sort((a, b) => (a.order || 0) - (b.order || 0) || a.id - b.id)
+                .forEach((node, index) => node.order = index + 1000);
+        });
+    };
+
+    const validateInputLength = (input, nodeId) => {
+        if (input.value.length > MAX_TEXT_LENGTH) {
+            input.value = input.value.substring(0, MAX_TEXT_LENGTH);
+            showErrorModal(`Maximal ${MAX_TEXT_LENGTH} Zeichen erlaubt!`);
+        }
+    };
+
+    const getTargetElement = (x, y) => {
+        return document.elementFromPoint(x, y);
+    };
+
+    // Modifizierte assignBranchColors Funktion für individuelle Farbschemen
+    function assignBranchColorsWithSchemes(node, defaultBranchColors, data) {
+        const getNodeColorScheme = (node) => {
+            if (node.originalScheme && BRANCH_COLORS_SCHEMES[node.originalScheme]) {
+                return BRANCH_COLORS_SCHEMES[node.originalScheme];
+            }
+            return defaultBranchColors;
+        };
+
+        const getAncestorColorScheme = (node, data) => {
+            if (node.level === 0 || node.level === 1) {
+                return getNodeColorScheme(node);
+            }
+            let current = node;
+            while (current && current.level > 1) {
+                current = data.find(n => n.id === current.parent);
+            }
+            return current ? getNodeColorScheme(current) : defaultBranchColors;
+        };
+
+        const getLevel2Ancestor = (node, data) => {
+            if (node.level <= 2) {
+                return node.level === 2 ? node : null;
+            }
+            let current = node;
+            while (current && current.level > 2) {
+                current = data.find(n => n.id === current.parent);
+            }
+            return current && current.level === 2 ? current : null;
+        };
+
+        const colorScheme = getAncestorColorScheme(node, data);
+
+        // Farben für Level-0 und Level-1
+        if (node.level === 0 || node.level === 1) {
+            node.color = colorScheme.level0;
+            node.borderColor = colorScheme.level0;
+            node.branchIndex = node.level === 0 ? 0 : node.branchIndex; // Level-1 behält seinen branchIndex
+        } else if (node.level === 2) {
+            // Level-2-Knoten erhalten eine Farbe basierend auf ihrem eigenen branchIndex
+            const siblings = data.filter(n => n.parent === node.parent).sort((a, b) => (a.order || 0) - (b.order || 0));
+            const siblingIndex = siblings.findIndex(ne => ne.id === node.id);
+            node.branchIndex = siblingIndex; // Sequenzieller branchIndex für Level-2
+            node.color = colorScheme.colors[node.branchIndex % colorScheme.colors.length];
+            node.borderColor = node.color;
+        } else {
+            // Level-3 und darunter erben die Farbe des Level-2-Vorfahren
+            const level2Ancestor = getLevel2Ancestor(node, data);
+            node.branchIndex = level2Ancestor ? level2Ancestor.branchIndex : 0;
+            node.color = colorScheme.colors[node.branchIndex % colorScheme.colors.length];
+            node.borderColor = node.color;
+        }
+
+        node.textColor = getContrastTextColor(node.color);
+
+        // Kinder rekursiv färben
+        node.children.forEach((child) => {
+            // Keine erneute Zuweisung von branchIndex hier, da dies in der Datenstruktur oder oben gesetzt wird
+            assignBranchColorsWithSchemes(child, defaultBranchColors, data);
+        });
+    }
+
+    function generateSVGWithIndividualSchemes(root, defaultBranchColors) {
+        if (!root) return '';
+        const padding = 100;
+
+        assignBranchColorsWithSchemes(root, defaultBranchColors, combinedData);
+        calculateLayout(root);
+
+        const { minX, minY, maxX, maxY } = getBounds(root);
+        const width = maxX - minX + padding * 2;
+        const height = maxY - minY + padding * 2;
+        let svg = `<svg width="${width}" height="${height}" style="height: auto" viewBox="${minX - padding} ${minY - padding} ${width} ${height}" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">`;
+
+        const drawConnections = node => {
+            node.children.forEach(child => {
+                const { fromX, fromY, toX, toY } = getConnectionPoint(node, child);
+                const childColorScheme = child.originalScheme && BRANCH_COLORS_SCHEMES[child.originalScheme]
+                    ? BRANCH_COLORS_SCHEMES[child.originalScheme]
+                    : defaultBranchColors;
+                const connectionColor = child.level <= 1 ? childColorScheme.level0 :
+                    childColorScheme.colors[child.branchIndex % childColorScheme.colors.length] || '#667eea';
+                svg += `<line x1="${fromX}" y1="${fromY}" x2="${toX}" y2="${toY}" stroke="${connectionColor}" stroke-width="2" stroke-linecap="round"/>`;
+                drawConnections(child);
+            });
+        };
+
+        const drawNodes = node => {
+            const nodeColorScheme = node.originalScheme && BRANCH_COLORS_SCHEMES[node.originalScheme]
+                ? BRANCH_COLORS_SCHEMES[node.originalScheme]
+                : defaultBranchColors;
+
+            // Bestimme die Textfarbe basierend auf der Füllfarbe, um Konsistenz mit generateSVG zu gewährleisten
+            const fillColorForTextContrast = node.level >= 4 ? '#ffffff' : node.color;
+            const textColor = getContrastTextColor(fillColorForTextContrast);
+
+            const { fillColor, fillOpacity, strokeColor, strokeWidth, strokeDasharray } = node.level === 0
+                ? { fillColor: node.color, strokeColor: node.borderColor, strokeWidth: 2, strokeDasharray: 'none', fillOpacity: '1' }
+                : node.level === 1
+                    ? { fillColor: node.color, strokeColor: node.borderColor, strokeWidth: 2, strokeDasharray: 'none', fillOpacity: '1' }
+                    : node.level === 2
+                        ? { fillColor: node.color, strokeColor: node.borderColor, strokeWidth: 2, strokeDasharray: '5,3', fillOpacity: '1' }
+                        : node.level === 3
+                            ? { fillColor: node.color, strokeColor: node.borderColor, strokeWidth: 2, strokeDasharray: '5,3', fillOpacity: '0.6' }
+                            : { fillColor: '#ffffff', strokeColor: node.borderColor, strokeWidth: 2, strokeDasharray: '5,3', fillOpacity: '0.6' };
+
+            const originalNode = combinedData.find(n => n.id === node.id);
+            const hasChildren = combinedData.some(n => n.parent === node.id);
+            let collapseIndicator = '';
+            if (node.level === 1 && hasChildren) {
+                const isCollapsed = originalNode && originalNode.isCollapsed;
+                const indicatorX = node.x + node.width - 15;
+                const indicatorY = node.y + 10;
+                collapseIndicator = `<text x="${indicatorX}" y="${indicatorY}" font-size="12" font-family="FontAwesome" fill="${textColor}" text-anchor="middle">${isCollapsed ? '+' : ''}</text>`;
+            }
+
+            svg += `<rect data-node-id="${node.id}" class="noderect" x="${node.x}" y="${node.y}" width="${node.width}" height="${node.height}" rx="8" fill="${fillColor}" fill-opacity="${fillOpacity}" stroke="${strokeColor}" stroke-width="${strokeWidth}" stroke-dasharray="${strokeDasharray}" style="cursor: ${node.level === 1 && hasChildren ? 'pointer' : 'default'}"/>`;
+
+            const words = node.text.split(' ').flatMap(word => {
+                const fontSize = Math.max(12, 18 - node.level);
+                if (measureTextWidth(word, fontSize) > 200) {
+                    return splitLongWord(word, 200, fontSize);
+                }
+                return word;
+            });
+            let line = '';
+            const lines = [];
+            const maxWidth = 200;
+            const fontSize = Math.max(12, 18 - node.level);
+            words.forEach(word => {
+                const testLine = line + word + ' ';
+                if (measureTextWidth(testLine, fontSize) > maxWidth && line.length > 0) {
+                    lines.push(line.trim());
+                    line = word + ' ';
+                } else {
+                    line = testLine;
+                }
+            });
+            if (line.length > 0) lines.push(line.trim());
+            const lineHeight = fontSize * 1.2;
+            const totalTextHeight = lines.length * lineHeight;
+            const startY = node.y + (node.height - totalTextHeight) / 2 + lineHeight * 0.7;
+            lines.forEach((textLine, index) => {
+                svg += `<text data-node-id="${node.id}" class="node-text" x="${node.x + node.width / 2}" y="${startY + index * lineHeight}" font-size="${fontSize}" font-family="Inter, system-ui, sans-serif" fill="${textColor}" text-anchor="middle" font-weight="${node.level === 0 ? '600' : '400'}" style="cursor: ${node.level === 1 && hasChildren ? 'pointer' : 'default'}">${textLine}</text>`;
+            });
+
+            svg += collapseIndicator;
+            node.children.forEach(drawNodes);
+        };
+
+        drawConnections(root);
+        drawNodes(root);
+        svg += '</svg>';
+        return svg;
+    }
 </script>
