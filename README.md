@@ -11,8 +11,6 @@ Users can create a mind map.
 Download the [release file](https://github.com/fdagner/mindmap_moodle-database-preset-/releases). 
 Create a "Database" activity in Moodle and then upload the ZIP file.
 
-**Important: Deactivate the autolink filter for activities.**
-
 ## Language Support
 
 The preset is available in German, but there is not so much to translate. The template can easily be adapted. 

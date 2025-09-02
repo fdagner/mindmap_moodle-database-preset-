@@ -37,32 +37,58 @@ const BRANCH_COLORS_SCHEMES = {
     'Kontrast': {
         level0: '#FF0099',
         colors: ['#FF0000', '#00FF00', '#0000FF', '#FF00FF', '#00FFFF', '#FFFF00', '#FF6600', '#0066FF', '#66FF00', '#CC00FF', '#00CC66', '#99FF00', '#3300FF', '#FFCC33', '#00FF99']
+    },
+    'Frühling': {
+        level0: '#98FB98',
+        colors: ['#adff2f', '#7fff00', '#32cd32', '#00fa9a', '#3cb371', '#90ee90', '#00ced1', '#20b2aa', '#afeeee', '#ffb6c1', '#ffc0cb', '#ff69b4', '#dda0dd']
+    },
+    'Retro': {
+        level0: '#ffcc00',
+        colors: ['#ff9966', '#ff6666', '#cc6699', '#9966cc', '#6699cc', '#66cccc', '#66cc99', '#99cc66', '#cccc66', '#ffcc66', '#ff9966']
+    },
+    'Pastell': {
+        level0: '#ffe4e1',
+        colors: ['#ffd1dc', '#ffe4b5', '#fafad2', '#e6e6fa', '#d8bfd8', '#dda0dd', '#b0e0e6', '#afeeee', '#98fb98', '#f5fffa', '#f0fff0', '#fffacd', '#ffe4e1']
+    },
+    'Neon': {
+        level0: '#39ff14',
+        colors: ['#39ff14', '#ff073a', '#fe019a', '#bc13fe', '#04d9ff', '#00ffff', '#ff6ec7', '#ff91a4', '#ffcc00', '#f5f547', '#ff5f1f', '#ff3131']
+    },
+    'Rams': {
+        level0: '#000',
+        colors: ['#e5e5e5', '#ff6900', '#ffd400', '#3fa535', '#0055a5', '#4f4f4f', '#7d7d7d']
+    },
+    'Monochrom': {
+        level0: '#000',
+        colors: ['#000']
     }
+
 };
 
-    // Function for calculating the relative luminance of a color
-    function calculateLuminance(hex) {
-        const rgb = hexToRgb(hex);
-        const [r, g, b] = rgb.map(c => {
-            c = c / 255;
-            return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
-        });
-        return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-    }
 
-    // Converts hex color to RGB
-    function hexToRgb(hex) {
-        hex = hex.replace(/^#/, '');
-        if (hex.length === 3) hex = hex.split('').map(c => c + c).join('');
-        const bigint = parseInt(hex, 16);
-        return [(bigint >> 16) & 255, (bigint >> 8) & 255, bigint & 255];
-    }
+// Function for calculating the relative luminance of a color
+function calculateLuminance(hex) {
+    const rgb = hexToRgb(hex);
+    const [r, g, b] = rgb.map(c => {
+        c = c / 255;
+        return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+    });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
 
-    // Selects text color based on background color
-    function getContrastTextColor(bgColor) {
-        const luminance = calculateLuminance(bgColor);
-        return luminance > 0.5 ? '#000000' : '#ffffff';
-    }
+// Converts hex color to RGB
+function hexToRgb(hex) {
+    hex = hex.replace(/^#/, '');
+    if (hex.length === 3) hex = hex.split('').map(c => c + c).join('');
+    const bigint = parseInt(hex, 16);
+    return [(bigint >> 16) & 255, (bigint >> 8) & 255, bigint & 255];
+}
+
+// Selects text color based on background color
+function getContrastTextColor(bgColor) {
+    const luminance = calculateLuminance(bgColor);
+    return luminance > 0.5 ? '#000000' : '#ffffff';
+}
 
 // Modal-Funktionen
 const showModal = (id, message, buttons = '') => {
@@ -91,66 +117,36 @@ const showSuccessModal = (message) => showModal('successModal', message);
 const closeSuccessModal = () => closeModal('successModal');
 const showWarningModal = (message) => !warningShown && showModal('warningModal', message);
 
-     // Measure text width
-        const measureTextWidth = (text, fontSize = 14, fontFamily = 'Inter, system-ui, sans-serif') => {
-            const canvas = document.createElement('canvas');
-            const context = canvas.getContext('2d');
-            context.font = `${fontSize}px ${fontFamily}`;
-            return context.measureText(text).width;
-        };
+// Measure text width
+const measureTextWidth = (text, fontSize = 14, fontFamily = 'Inter, system-ui, sans-serif') => {
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    context.font = `${fontSize}px ${fontFamily}`;
+    return context.measureText(text).width;
+};
 
-    // Lange Wörter aufteilen
-    const splitLongWord = (word, maxWidth, fontSize, fontFamily = 'Inter, system-ui, sans-serif') => {
-        const chars = word.split('');
-        const result = [];
-        let current = '';
+// Lange Wörter aufteilen
+const splitLongWord = (word, maxWidth, fontSize, fontFamily = 'Inter, system-ui, sans-serif') => {
+    const chars = word.split('');
+    const result = [];
+    let current = '';
 
-        for (let i = 0; i < chars.length; i++) {
-            const test = current + chars[i];
-            if (measureTextWidth(test, fontSize, fontFamily) <= maxWidth) {
-                current += chars[i];
+    for (let i = 0; i < chars.length; i++) {
+        const test = current + chars[i];
+        if (measureTextWidth(test, fontSize, fontFamily) <= maxWidth) {
+            current += chars[i];
+        } else {
+            if (current.length > 0) {
+                result.push(current + (i < chars.length - 1 ? '-' : ''));
+                current = chars[i];
             } else {
-                if (current.length > 0) {
-                    result.push(current + (i < chars.length - 1 ? '-' : ''));
-                    current = chars[i];
-                } else {
-                    result.push(chars[i] + (i < chars.length - 1 ? '-' : ''));
-                    current = '';
-                }
+                result.push(chars[i] + (i < chars.length - 1 ? '-' : ''));
+                current = '';
             }
         }
-        if (current.length > 0) result.push(current);
-        return result;
-    };
-
-function toggleFullscreen() {
-    const fsContainer = document.getElementById("fullscreen_mindmap");
-    const mermaid = document.getElementById("svgZoomContainer");
-
-    if (!document.fullscreenElement &&
-        !document.webkitFullscreenElement &&
-        !document.msFullscreenElement) {
-        // Vollbild starten
-        if (fsContainer.requestFullscreen) fsContainer.requestFullscreen();
-        else if (fsContainer.webkitRequestFullscreen) fsContainer.webkitRequestFullscreen();
-        else if (fsContainer.msRequestFullscreen) fsContainer.msRequestFullscreen();
-
-        // Child per JS anpassen
-   mermaid?.classList.add("fullscreen-mermaid");
-    } else {
-        // Vollbild beenden
-        if (document.exitFullscreen) document.exitFullscreen();
-        else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
-        else if (document.msExitFullscreen) document.msExitFullscreen();
-        // Child wieder zurücksetzen
-    mermaid?.classList.remove("fullscreen-mermaid");
     }
-}
+    if (current.length > 0) result.push(current);
+    return result;
+};
 
-// Optional: sicherstellen, dass auch bei ESC-Taste das Child zurückgesetzt wird
-document.addEventListener("fullscreenchange", () => {
-    const mermaid = document.getElementById("svgZoomContainer");
-    if (!document.fullscreenElement) {
-    mermaid?.classList.remove("fullscreen-mermaid");
-    }
-});
+
