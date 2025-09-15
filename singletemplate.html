@@ -22,7 +22,7 @@
                         class="fa-solid fa-magnifying-glass-minus"></i></button>
                 <button type="button" class="btn btn-light" onclick="resetZoom()" title="Zoom zurücksetzen"><i
                         class="fa-solid fa-arrows-to-circle"></i></button>
-                <button type="button" class="btn btn-light" onclick="toggleFullscreen()" title="Präsentationsmodus"><i
+                <button type="button" class="btn btn-light toggle-fullscreen-btn" onclick="togglePresentationMode()" title="Präsentationsmodus"><i
                         class="fa-solid fa-person-chalkboard"></i></button>
                 <div class="dropdown">
                     <button class="btn btn-light dropdown-toggle" type="button" data-bs-toggle="dropdown"
@@ -1106,7 +1106,7 @@
                     const isCollapsed = originalNode && originalNode.isCollapsed;
                     const indicatorX = node.x + node.width - 15;
                     const indicatorY = node.y + 10;
-                    collapseIndicator = `<text x="${indicatorX}" y="${indicatorY}" font-size="12" font-family="Arial, sans-serif" fill="${textColor}" text-anchor="middle">${isCollapsed ? '+' : '-'}</text>`;
+                    collapseIndicator = `<text x="${indicatorX}" y="${indicatorY}" font-size="12" font-family="Arial, sans-serif" fill="${textColor}" text-anchor="middle">${isCollapsed ? '+' : ''}</text>`;
                 }
                 svg += `<rect data-node-id="${node.id}" class="node-rect" x="${node.x}" y="${node.y}" width="${node.width}" height="${node.height}" rx="8" fill="${fillColor}" fill-opacity="${fillOpacity || '1'}" stroke="${strokeColor}" stroke-width="${strokeWidth}" stroke-dasharray="${strokeDasharray}" style="cursor: ${node.level === 1 && hasChildren ? 'pointer' : 'default'}"/>`;
                 const words = node.text.split(' ').flatMap(word => {
@@ -1214,35 +1214,7 @@
             }
         };
 
-        function toggleFullscreen() {
-            const fsContainer = document.getElementById("fullscreen_mindmap");
-            const mermaid = document.getElementById("svgZoomContainer");
-            const mindmap = document.getElementById("mindmapEditor");
-
-            const isFullscreen = document.fullscreenElement ||
-                document.webkitFullscreenElement ||
-                document.msFullscreenElement;
-
-            if (!isFullscreen) {
-                // Vollbild starten
-                if (fsContainer.requestFullscreen) fsContainer.requestFullscreen();
-                else if (fsContainer.webkitRequestFullscreen) fsContainer.webkitRequestFullscreen();
-                else if (fsContainer.msRequestFullscreen) fsContainer.msRequestFullscreen();
-
-                // Child-Elemente anpassen
-                mermaid?.classList.add("fullscreen-mermaid");
-                editor?.classList.add("fullscreenMindmapEditor");
-                mindmap?.classList.add("fullscreenMindmapEditor");
-            } else {
-                // Vollbild beenden
-                if (document.exitFullscreen) document.exitFullscreen();
-                else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
-                else if (document.msExitFullscreen) document.msExitFullscreen();
-
-                // Optional: Fullscreen-Klassen können hier bleiben,
-                // werden beim Reload sowieso entfernt
-            }
-        }
+       
 
         // Event Listener: ESC oder anderes Beenden des Vollbildes
         document.addEventListener("fullscreenchange", () => {
@@ -1256,7 +1228,29 @@
             }
         });
 
+function togglePresentationMode() {
+    const fsContainer = document.getElementById("fullscreen_mindmap");
+    const previewPanel = document.querySelector('.preview-panel');
+    const toggleButton = document.querySelector('.toggle-fullscreen-btn');
 
+    if (fsContainer.classList.contains('fullscreen-mode')) {
+        // Modus beenden
+        fsContainer.classList.remove('fullscreen-mode');
+        previewPanel.style.overflow = 'auto'; //
+        // Optionale: Zoom resetten, falls nötig
+        resetZoom();
+    } else {
+        // Modus starten
+        fsContainer.classList.add('fullscreen-mode');
+        previewPanel.style.overflow = 'hidden'; // Verhindere Scrollbars im Modus
+     }
+}
+
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && document.getElementById("fullscreen_mindmap").classList.contains('fullscreen-mode')) {
+        togglePresentationMode();
+    }
+});
 
     </script>
 </div>

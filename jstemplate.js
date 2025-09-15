@@ -125,7 +125,7 @@ const measureTextWidth = (text, fontSize = 14, fontFamily = 'Inter, system-ui, s
     return context.measureText(text).width;
 };
 
-// Lange Wörter aufteilen
+// Split long words
 const splitLongWord = (word, maxWidth, fontSize, fontFamily = 'Inter, system-ui, sans-serif') => {
     const chars = word.split('');
     const result = [];

@@ -1,17 +1,51 @@
-<style>
-    #[[color_theme#id]] {
-        background-color: #f8f9fa;
-        border-color: #f8f9fa;
-    }
+    <style>
+        #[[color_theme#id]] {
+            background-color: #f8f9fa;
+            border-color: #f8f9fa;
+        }
 
-    label[for="[[color_theme#id]]"] {
-        display: block;
-    }
-</style>
+        label[for="[[color_theme#id]]"] {
+            display: block;
+        }
 
-<div class="main-content">
+        .node.dragging {
+            opacity: 0.5;
+        }
+
+        .node.drag-over-child {
+            background-color: #e6f3ff;
+        }
+
+
+        .node.drag-over-sibling::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background-color: #007bff;
+        }
+
+        .node.drag-over-sibling-top::before {
+            content: '';
+            position: absolute;
+            top: -2px;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background-color: #007bff;
+
+        }
+
+        .add-btn.drop-target {
+            background-color: #d4edda;
+        }
+    </style>
+
+<div class="main-content" id="fullscreen_mindmap">
     <div class="zoom-controls">
-        <div class="mindmap">
+        <div class="mindmap fullscreen_mindmap">
             <div class="mindmap_buttons">
                 <button type="button" class="btn btn-light toggle-editor-btn" onclick="toggleEditor()"
                     title="Listenmodus umschalten"><i class="fa-solid fa-list"></i></button>
@@ -21,6 +55,8 @@
                         class="fa-solid fa-magnifying-glass-minus"></i></button>
                 <button type="button" class="btn btn-light" onclick="resetZoom()" title="Zoom zurücksetzen"><i
                         class="fa-solid fa-arrows-to-circle"></i></button>
+                <button type="button" class="btn btn-light toggle-fullscreen-btn" onclick="togglePresentationMode()" title="Präsentationsmodus"><i
+                        class="fa-solid fa-person-chalkboard"></i></button>
                 [[color_theme]]
             </div>
         </div>
@@ -80,8 +116,8 @@
     </div>
 
     <script>
-
-        let BRANCH_COLORS = BRANCH_COLORS_SCHEMES['Standard'].colors;
+ 
+   let BRANCH_COLORS = BRANCH_COLORS_SCHEMES['Standard'].colors;
         const editor = document.getElementById('mindmapEditor');
         const previewContainer = document.getElementById('svgZoomContainer');
         const mermaidInput = document.getElementById('[[mermaid_text#id]]');
@@ -117,13 +153,12 @@
                 previewPanel.style.display = 'none';
                 toggleButton.innerHTML = '<i class="fa-solid fa-lightbulb"></i>';
                 zoomButtons.forEach(button => button.style.display = 'none');
-                if (welcomeMessage) welcomeMessage.style.display = 'none'; // Hide message when switching to editor
+                if (welcomeMessage) welcomeMessage.style.display = 'none';
             } else {
                 editorPanel.style.display = 'none';
                 previewPanel.style.display = 'block';
                 toggleButton.innerHTML = '<i class="fa-solid fa-list"></i>';
                 zoomButtons.forEach(button => button.style.display = 'inline-block');
-                // Show message if no children and no interaction yet
                 if (welcomeMessage && !hasInteractedWithRoot && !mindmapData.some(node => node.parent !== null)) {
                     welcomeMessage.style.display = 'block';
                 }
@@ -162,7 +197,6 @@
                 colorThemeSelect.addEventListener('change', setColorScheme);
             }
         });
-
 
         // Zoom
         const zoomSvg = (factor) => {
@@ -215,7 +249,6 @@
             }
         };
 
-
         // Initializes mind map data from Mermaid code
         function initializeFromMermaidCode() {
             if (!mermaidInput) {
@@ -232,7 +265,7 @@
                 };
                 mindmapData.push(defaultRootNode);
                 renderEditor();
-                if (welcomeMessage) welcomeMessage.style.display = 'block'; // Show message for default case
+                if (welcomeMessage) welcomeMessage.style.display = 'block';
                 return;
             }
 
@@ -255,7 +288,7 @@
                 mindmapData.push(defaultRootNode);
                 mermaidInput.value = 'mindmap|root(Hauptknoten)';
                 renderEditor();
-                if (welcomeMessage) welcomeMessage.style.display = 'block'; // Show message for empty mindmap
+                if (welcomeMessage) welcomeMessage.style.display = 'block';
                 return;
             }
 
@@ -332,11 +365,11 @@
                 };
                 mindmapData.push(defaultRootNode);
                 mermaidInput.value = 'mindmap|root(Hauptknoten)';
-                if (welcomeMessage) welcomeMessage.style.display = 'block'; // Show message for empty mindmap
+                if (welcomeMessage) welcomeMessage.style.display = 'block';
             } else if (welcomeMessage && !mindmapData.some(node => node.parent !== null)) {
-                welcomeMessage.style.display = 'block'; // Show message if no child nodes
+                welcomeMessage.style.display = 'block';
             } else if (welcomeMessage) {
-                welcomeMessage.style.display = 'none'; // Hide message if there are child nodes
+                welcomeMessage.style.display = 'none';
             }
 
             renderEditor();
@@ -388,7 +421,6 @@
                 nodeDiv.dataset.level = node.level;
                 nodeDiv.draggable = true;
 
-                // Ensure that branchIndex is correct
                 const parent = node.level > 0 ? mindmapData.find(n => n.id === node.parent) : null;
                 node.branchIndex = node.level === 0 ? 0 :
                     node.level === 1 ? mindmapData.filter(n => n.parent === node.parent).sort((a, b) => (a.order || 0) - (b.order || 0)).indexOf(node) :
@@ -434,7 +466,12 @@
                 nodeDiv.addEventListener('drop', handleDrop);
                 nodeDiv.addEventListener('dragend', handleDragEnd);
                 nodeDiv.addEventListener('dragenter', e => e.preventDefault());
-                nodeDiv.addEventListener('dragleave', e => !e.target.closest('.node').contains(e.relatedTarget) && e.target.closest('.node').classList.remove('drag-over-child'));
+                nodeDiv.addEventListener('dragleave', e => {
+                    const node = e.target.closest('.node');
+                    if (node && !node.contains(e.relatedTarget)) {
+                        node.classList.remove('drag-over-child', 'drag-over-sibling', 'drag-over-sibling-top');
+                    }
+                });
                 nodeDiv.addEventListener('touchmove', handleTouchMove, { passive: false });
                 nodeDiv.addEventListener('touchend', handleTouchEnd, { passive: false });
 
@@ -518,7 +555,6 @@
             renderEditor();
             renderMindmap();
             if (welcomeMessage && parent.level === 0) welcomeMessage.style.display = 'none';
-            // Focus input in SVG mode only
             if (isSvgMode) {
                 setTimeout(() => {
                     const svgContainer = document.querySelector('#svgZoomContainer svg');
@@ -588,11 +624,9 @@
                     }
                 }, 100);
             } else {
-                // In editor mode, focus the input field as before
                 setTimeout(() => document.querySelector(`input[onchange*="${newNode.id}"]`)?.focus()?.select(), 100);
             }
         };
-
 
         const showDeleteModal = nodeId => {
             nodeToDelete = parseInt(nodeId);
@@ -633,7 +667,7 @@
                 const newRootNode = { id: nodeCounter++, text: 'Hauptknoten', level: 0, parent: null, order: 0, branchIndex: 0, isCollapsed: false };
                 mindmapData.push(newRootNode);
                 if (mermaidInput) mermaidInput.value = 'mindmap|root(Hauptknoten)';
-                if (welcomeMessage) welcomeMessage.style.display = 'block'; // Show message after resetting mindmap
+                if (welcomeMessage) welcomeMessage.style.display = 'block';
             } else if (deleteBranch) {
                 deleteNodeAndChildren(id);
                 normalizeOrders();
@@ -666,7 +700,7 @@
             mindmapData.filter(node => node.parent === id).forEach(child => deleteNodeAndChildren(child.id));
             mindmapData = mindmapData.filter(node => node.id !== id);
             if (welcomeMessage && !mindmapData.some(node => node.parent !== null)) {
-                welcomeMessage.style.display = 'block'; // Show message if no child nodes remain
+                welcomeMessage.style.display = 'block';
             }
         };
 
@@ -706,9 +740,27 @@
         const handleDragOver = e => {
             e.preventDefault();
             e.dataTransfer.dropEffect = 'move';
-            document.querySelectorAll('.node').forEach(n => n.classList.remove('drag-over-child'));
             const targetNode = e.target.closest('.node');
-            if (targetNode && parseInt(targetNode.dataset.nodeId) !== draggedNode) {
+            if (!targetNode || parseInt(targetNode.dataset.nodeId) === draggedNode) return;
+
+            document.querySelectorAll('.node').forEach(n => n.classList.remove('drag-over-child', 'drag-over-sibling', 'drag-over-sibling-top'));
+
+            const rect = targetNode.getBoundingClientRect();
+            const offsetY = e.clientY - rect.top;
+            const nodeToMove = mindmapData.find(n => n.id === draggedNode);
+            const targetNodeData = mindmapData.find(n => n.id === parseInt(targetNode.dataset.nodeId));
+
+            if (nodeToMove && targetNodeData && nodeToMove.parent === targetNodeData.parent && nodeToMove.level > 0) {
+                // Same parent, consider reordering
+                const threshold = rect.height / 3;
+                if (offsetY < threshold) {
+                    targetNode.classList.add('drag-over-sibling-top');
+                } else if (offsetY > rect.height - threshold) {
+                    targetNode.classList.add('drag-over-sibling');
+                } else {
+                    targetNode.classList.add('drag-over-child');
+                }
+            } else {
                 targetNode.classList.add('drag-over-child');
             }
         };
@@ -729,15 +781,34 @@
 
         const handleDrop = e => {
             e.preventDefault();
-            const targetNodeId = parseInt(e.target.closest('.node').dataset.nodeId);
-            if (draggedNode !== targetNodeId) moveNodeAdvanced(draggedNode, targetNodeId, 'child');
-            document.querySelectorAll('.node').forEach(node => node.classList.remove('drag-over-child'));
+            const targetNode = e.target.closest('.node');
+            if (!targetNode) return;
+            const targetNodeId = parseInt(targetNode.dataset.nodeId);
+            if (draggedNode === targetNodeId) return;
+
+            const rect = targetNode.getBoundingClientRect();
+            const offsetY = e.clientY - rect.top;
+            const nodeToMove = mindmapData.find(n => n.id === draggedNode);
+            const targetNodeData = mindmapData.find(n => n.id === targetNodeId);
+
+            let dropType = 'child';
+            if (nodeToMove.parent === targetNodeData.parent && nodeToMove.level > 0) {
+                const threshold = rect.height / 3;
+                if (offsetY < threshold) {
+                    dropType = 'before';
+                } else if (offsetY > rect.height - threshold) {
+                    dropType = 'after';
+                }
+            }
+
+            moveNodeAdvanced(draggedNode, targetNodeId, dropType);
+            document.querySelectorAll('.node').forEach(node => node.classList.remove('drag-over-child', 'drag-over-sibling', 'drag-over-sibling-top'));
         };
 
         const handleDragEnd = e => {
             e.target.closest('.node').classList.remove('dragging');
             draggedNode = null;
-            document.querySelectorAll('.node').forEach(node => node.classList.remove('drag-over-child'));
+            document.querySelectorAll('.node').forEach(node => node.classList.remove('drag-over-child', 'drag-over-sibling', 'drag-over-sibling-top'));
             document.querySelectorAll('.add-btn').forEach(btn => {
                 btn.style.boxShadow = 'none';
                 btn.classList.remove('drop-target');
@@ -748,10 +819,25 @@
             if (!draggedNode || e.touches.length > 1) return;
             e.preventDefault();
             const touch = e.touches[0];
-            document.querySelectorAll('.node').forEach(n => n.classList.remove('drag-over-child'));
+            document.querySelectorAll('.node').forEach(n => n.classList.remove('drag-over-child', 'drag-over-sibling', 'drag-over-sibling-top'));
             const targetNode = getTargetElement(touch.clientX, touch.clientY)?.closest('.node');
             if (targetNode && parseInt(targetNode.dataset.nodeId) !== draggedNode) {
-                targetNode.classList.add('drag-over-child');
+                const rect = targetNode.getBoundingClientRect();
+                const offsetY = touch.clientY - rect.top;
+                const nodeToMove = mindmapData.find(n => n.id === draggedNode);
+                const targetNodeData = mindmapData.find(n => n.id === parseInt(targetNode.dataset.nodeId));
+                if (nodeToMove && targetNodeData && nodeToMove.parent === targetNodeData.parent && nodeToMove.level > 0) {
+                    const threshold = rect.height / 3;
+                    if (offsetY < threshold) {
+                        targetNode.classList.add('drag-over-sibling-top');
+                    } else if (offsetY > rect.height - threshold) {
+                        targetNode.classList.add('drag-over-sibling');
+                    } else {
+                        targetNode.classList.add('drag-over-child');
+                    }
+                } else {
+                    targetNode.classList.add('drag-over-child');
+                }
             }
         };
 
@@ -766,10 +852,23 @@
             if (dropZone && draggedNode !== parseInt(dropZone.dataset.nodeId)) {
                 moveNodeAdvanced(draggedNode, parseInt(dropZone.dataset.nodeId), 'child');
             } else if (targetNode && draggedNode !== parseInt(targetNode.dataset.nodeId)) {
-                moveNodeAdvanced(draggedNode, parseInt(targetNode.dataset.nodeId), 'child');
+                const rect = targetNode.getBoundingClientRect();
+                const offsetY = touch.clientY - rect.top;
+                const nodeToMove = mindmapData.find(n => n.id === draggedNode);
+                const targetNodeData = mindmapData.find(n => n.id === parseInt(targetNode.dataset.nodeId));
+                let dropType = 'child';
+                if (nodeToMove.parent === targetNodeData.parent && nodeToMove.level > 0) {
+                    const threshold = rect.height / 3;
+                    if (offsetY < threshold) {
+                        dropType = 'before';
+                    } else if (offsetY > rect.height - threshold) {
+                        dropType = 'after';
+                    }
+                }
+                moveNodeAdvanced(draggedNode, parseInt(targetNode.dataset.nodeId), dropType);
             }
 
-            document.querySelectorAll('.node').forEach(node => node.classList.remove('dragging', 'drag-over-child'));
+            document.querySelectorAll('.node').forEach(node => node.classList.remove('dragging', 'drag-over-child', 'drag-over-sibling', 'drag-over-sibling-top'));
             document.querySelectorAll('.add-btn').forEach(btn => {
                 btn.style.boxShadow = 'none';
                 btn.classList.remove('drop-target');
@@ -784,6 +883,7 @@
             if (isDescendant(nodeToMove.id, targetNode.id)) {
                 return showErrorModal('Ein Knoten kann nicht zu seinem eigenen Unterknoten verschoben werden!');
             }
+
             if (dropType === 'child') {
                 const childrenCount = mindmapData.filter(node => node.parent === targetNode.id && node.id !== nodeToMove.id).length;
                 if (childrenCount >= MAX_CHILDREN_PER_NODE) {
@@ -802,14 +902,23 @@
                 nodeToMove.branchIndex = targetNode.level === 0 ? siblings.length : targetNode.branchIndex;
                 nodeToMove.isCollapsed = newLevel === 1 ? false : undefined;
                 if (targetNode.level === 1) targetNode.isCollapsed = false;
-                if (targetNode.level === 0 && welcomeMessage) welcomeMessage.style.display = 'none'; // Hide message when adding child to root
+                if (targetNode.level === 0 && welcomeMessage) welcomeMessage.style.display = 'none';
+            } else if (dropType === 'before' || dropType === 'after') {
+                if (nodeToMove.parent !== targetNode.parent || nodeToMove.level === 0) {
+                    return showErrorModal('Knoten können nur innerhalb derselben Hierarchieebene neu angeordnet werden.');
+                }
+                const siblings = mindmapData.filter(node => node.parent === nodeToMove.parent && node.id !== nodeToMove.id)
+                    .sort((a, b) => (a.order || 0) - (b.order || 0));
+                const targetIndex = siblings.findIndex(s => s.id === targetNode.id);
+                const newOrder = dropType === 'before' ? (targetNode.order || 0) : (targetNode.order || 0) + 1;
+                nodeToMove.order = newOrder;
+                siblings.splice(targetIndex + (dropType === 'after' ? 1 : 0), 0, nodeToMove);
+                siblings.forEach((sibling, index) => {
+                    sibling.order = index + 1000;
+                    sibling.branchIndex = nodeToMove.parent === null ? index : mindmapData.find(n => n.id === nodeToMove.parent).branchIndex;
+                });
             }
-            const parentId = nodeToMove.parent;
-            const allSiblings = mindmapData.filter(node => node.parent === parentId)
-                .sort((a, b) => (a.order || 0) - (b.order || 0));
-            allSiblings.forEach((sibling, index) => {
-                sibling.branchIndex = parentId === null ? index : mindmapData.find(n => n.id === parentId).branchIndex;
-            });
+
             updateChildrenLevels(nodeToMove.id, nodeToMove.level);
             normalizeOrders();
             renderEditor();
@@ -885,7 +994,6 @@
             return root;
         };
 
-
         // Assign colors for branches
         const assignBranchColors = node => {
             const colorThemeSelect = document.getElementById('[[color_theme#id]]');
@@ -898,7 +1006,6 @@
                 assignBranchColors(child);
             });
         };
-
 
         const countNodes = node => 1 + node.children.reduce((sum, child) => sum + countNodes(child), 0);
 
@@ -1149,10 +1256,10 @@
                             overlay.style.left = `${rect.left + window.scrollX}px`;
                             overlay.style.top = `${rect.bottom + window.scrollY + 5}px`;
                             overlay.innerHTML = `
-                        <button class="edit-btn" title="Knoten bearbeiten"><i class="fa-solid fa-edit"></i></button>
-                        <button class="plus-btn" title="Neuer Unterknoten"><i class="fa-solid fa-plus"></i></button>
-                        <button class="delete-btn" title="Knoten löschen"><i class="fa-solid fa-trash"></i></button>
-                    `;
+                                <button class="edit-btn" title="Knoten bearbeiten"><i class="fa-solid fa-edit"></i></button>
+                                <button class="plus-btn" title="Neuer Unterknoten"><i class="fa-solid fa-plus"></i></button>
+                                <button class="delete-btn" title="Knoten löschen"><i class="fa-solid fa-trash"></i></button>
+                            `;
                             document.body.appendChild(overlay);
                             overlay.querySelector('.edit-btn').addEventListener('click', (e) => {
                                 e.stopPropagation();
@@ -1251,7 +1358,6 @@
                         }
                     });
                 }
-                // Corrected welcome message logic with proper syntax
                 if (welcomeMessage && typeof hasInteractedWithRoot !== 'undefined' && !hasInteractedWithRoot && !mindmapData.some(node => node.parent !== null)) {
                     welcomeMessage.style.display = 'block';
                 } else if (welcomeMessage) {
@@ -1263,15 +1369,40 @@
                     return match ? ' '.repeat(match[1]?.length || 0) + match[0].replace(/^~*/, '') : line;
                 }).join('\n');
                 previewContainer.innerHTML = `
-            <div style="background: #f1f3f4; padding: 20px; border-radius: 12px; border-left: 4px solid #dc2626;">
-                <h4 style="margin: 0 0 10px 0; color: #dc2626;">⚠️ Vorschau nicht verfügbar</h4>
-                <p style="color: #6b7280; margin: 0 0 15px 0; font-size: 14px;">Rendering-Fehler: ${error.message}</p>
-                <h5 style="margin: 15px 0 10px 0; color: #1f2937;">📋 Generierter Code:</h5>
-                <pre style="background: white; padding: 15px; border-radius: 8px; font-family: 'Courier New', monospace; font-size: 13px; line-height: 1.4; overflow-x: auto; margin: 0; border: 1px solid #e5e7eb;">${mermaidCode}</pre>
-            </div>
-        `;
+                    <div style="background: #f1f3f4; padding: 20px; border-radius: 12px; border-left: 4px solid #dc2626;">
+                        <h4 style="margin: 0 0 10px 0; color: #dc2626;">⚠️ Vorschau nicht verfügbar</h4>
+                        <p style="color: #6b7280; margin: 0 0 15px 0; font-size: 14px;">Rendering-Fehler: ${error.message}</p>
+                        <h5 style="margin: 15px 0 10px 0; color: #1f2937;">📋 Generierter Code:</h5>
+                        <pre style="background: white; padding: 15px; border-radius: 8px; font-family: 'Courier New', monospace; font-size: 13px; line-height: 1.4; overflow-x: auto; margin: 0; border: 1px solid #e5e7eb;">${mermaidCode}</pre>
+                    </div>
+                `;
                 if (welcomeMessage) welcomeMessage.style.display = 'none';
             }
         };
+
+        function togglePresentationMode() {
+            const fsContainer = document.getElementById("fullscreen_mindmap");
+            const previewPanel = document.querySelector('.preview-panel');
+            const toggleButton = document.querySelector('.toggle-fullscreen-btn');
+
+            if (fsContainer.classList.contains('fullscreen-mode')) {
+                fsContainer.classList.remove('fullscreen-mode');
+                previewPanel.style.overflow = 'auto';
+                resetZoom();
+            } else {
+                fsContainer.classList.add('fullscreen-mode');
+                previewPanel.style.overflow = 'hidden';
+            }
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && document.getElementById("fullscreen_mindmap").classList.contains('fullscreen-mode')) {
+                togglePresentationMode();
+            }
+        });
+
+      
+
+ 
     </script>
 </div>
