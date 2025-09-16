@@ -5,7 +5,7 @@
 
 <settings>
 <intro/>
-<comments>1</comments>
+<comments>0</comments>
 <requiredentries>0</requiredentries>
 <requiredentriestoview>0</requiredentriestoview>
 <maxentries>0</maxentries>
@@ -31,8 +31,14 @@ Hell
 Dunkel
 Winter
 Herbst
+Fr&#xFC;hling
 Sommer
-Kontrast</param1>
+Kontrast
+Retro
+Pastell
+Monochrom
+Neon
+Rams</param1>
 </field>
 
 </preset>
