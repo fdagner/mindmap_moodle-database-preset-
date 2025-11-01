@@ -17,28 +17,115 @@
 </settings>
 
 <field>
-<type>text</type>
-<name>mermaid_text</name>
+<type>textarea</type>
+<name>Hilfe 1</name>
 <required>0</required>
+<param2>35</param2>
+<param3>8</param3>
+<param4>1</param4>
+<param5>0</param5>
 </field>
 
 <field>
 <type>menu</type>
-<name>color_theme</name>
+<name>L&#xF6;sung anzeigen</name>
 <required>0</required>
-<param1>Standard
-Hell
-Dunkel
-Winter
-Herbst
-Fr&#xFC;hling
-Sommer
-Kontrast
-Retro
-Pastell
-Monochrom
-Neon
-Rams</param1>
+<param1>ja
+nein</param1>
+</field>
+
+<field>
+<type>textarea</type>
+<name>L&#xF6;sung</name>
+<required>0</required>
+<param2>35</param2>
+<param3>8</param3>
+<param4>1</param4>
+<param5>0</param5>
+</field>
+
+<field>
+<type>text</type>
+<name>Thema</name>
+<required>0</required>
+</field>
+
+<field>
+<type>textarea</type>
+<name>Hilfe 2</name>
+<required>0</required>
+<param2>35</param2>
+<param3>15</param3>
+<param4>1</param4>
+<param5>0</param5>
+</field>
+
+<field>
+<type>menu</type>
+<name>&#xDC;berschrift Hilfe 1</name>
+<required>0</required>
+<param1>Abbildung
+Anleitung
+Arbeitsblatt
+Audio
+Beispiel
+Checkliste
+Erl&#xE4;uterung
+Experiment/Demo
+Formel
+Gestufte Hilfe 1
+Gestufte Hilfe 2
+Gestufte Hilfe 3
+Grafik
+Hilfe
+Infografik
+Info
+Karte
+Link
+Merksatz
+Mindmap
+Quiz/Test
+Schema
+Simulation
+Sonstiges
+Tabelle
+Text
+&#xDC;bung
+Video</param1>
+</field>
+
+<field>
+<type>menu</type>
+<name>&#xDC;berschrift Hilfe 2</name>
+<required>0</required>
+<param1>Abbildung
+Anleitung
+Arbeitsblatt
+Audio
+Beispiel
+Checkliste
+Erl&#xE4;uterung
+Experiment/Demo
+Formel
+Gestufte Hilfe 1
+Gestufte Hilfe 2
+Gestufte Hilfe 3
+Grafik
+Hilfe
+Infografik
+Info
+Karte
+Link
+Merksatz
+Mindmap
+Quiz/Test
+Schema
+Simulation
+Sonstiges
+Tabelle
+Text
+&#xDC;bung
+Video</param1>
 </field>
 
 </preset>
