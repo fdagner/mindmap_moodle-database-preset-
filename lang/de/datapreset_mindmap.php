@@ -18,13 +18,12 @@
 /**
  * Strings for component 'datapreset_geomap', language 'en'
  *
- * @package   datapreset_geomap
+ * @package   datapreset_mindmap
  * @copyright 2025 Florian Dagner <florian.dagner@outlook.de>
  * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-$string['modulename'] = 'conceptmap';
-$string['modulename_help'] = 'Users can make a conceptmap.';
-$string['pluginname'] = 'conceptmap';
-$string['privacy:metadata'] = 'conceptmap plugin does not store any personal data.';
-
+$string['modulename'] = 'mindmap';
+$string['modulename_help'] = 'Users can make a mindmap.';
+$string['pluginname'] = 'mindmap';
+$string['privacy:metadata'] = 'mindmap plugin does not store any personal data.';

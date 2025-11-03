@@ -16,7 +16,7 @@
 
 /**
  * @package    datapreset
- * @subpackage conceptmap
+ * @subpackage mindmap
  * @copyright  Florian Dagner <florian.dagner@outlook.de>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -25,4 +25,4 @@ defined('MOODLE_INTERNAL') || die();
 
 $plugin->version   = 2025110300;        // The current plugin version (Date: YYYYMMDDXX).
 $plugin->requires  = 2023080100;        // Requires this Moodle version.
-$plugin->component = 'datapreset_conceptmap'; // Full name of the plugin (used for diagnostics)
+$plugin->component = 'datapreset_mindmap'; // Full name of the plugin (used for diagnostics)

@@ -17,12 +17,12 @@
 /**
  * Privacy provider implementation for datapreset_imagegallery.
  *
- * @package    datapreset_conceptmap
+ * @package    datapreset_mindmap
  * @copyright  2023 Florian Dagner <florian.dagner@outlook.de>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-namespace datapreset_conceptmap\privacy;
+namespace datapreset_mindmap\privacy;
 
 defined('MOODLE_INTERNAL') || die();
 
