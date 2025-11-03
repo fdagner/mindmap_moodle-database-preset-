@@ -1,1256 +1,617 @@
-<style>
-    .node-action-overlay {
-        display: none;
+<div class="conceptmap">
+<h3>[[thema]]</h3>
+<div class="inner">
+    <div id="toolbar" class="container-fluid bg-dark text-white p-3 d-flex flex-wrap align-items-center gap-2 justify-content-end">
+     <div class="config-section" style="display: none;">
+             <label for="json##id##">Konfiguration (JSON):</label>
+<input class="basefieldinput form-control d-inline mod-data-input" type="text" name="json##id##" id="json##id##" value=''>
+        </div>
+      <button type="button" id="exportSVG" class="btn btn-secondary btn-sm"><i class="fa-solid fa-file-export"></i> SVG</button>##actionsmenu##
+</div>
+
+    <div id="import-area" style="display: none;">[[code]]</div>
+    
+    
+    <div id="canvas" style="touch-action: auto;">
+      <svg id="svg"></svg>
+    </div>
+
+   </div>
+  </div>
+ 
+ 
+
+ 
+  <script>
+    const canvas = document.querySelector('.conceptmap #canvas');
+    const svg = document.querySelector('.conceptmap #svg');
+    const jsonInput = document.querySelector('.conceptmap #json##id##');
+    
+    let nodes = [];
+    let connections = [];
+    let connectStart = null;
+    let draggedNode = null;
+    let draggedControl = null;
+    let potentialDraggedControl = null;
+    let dragStartPos = { x: 0, y: 0 };
+    let hasMoved = false;
+    let selectedNode = null;
+    let selectedConnection = null;
+    let nodeIdCounter = 1;
+    let connectionIdCounter = 1;
+
+    // SVG Pfeilspitze definieren
+    svg.innerHTML = `
+      <defs>
+        <marker id="arrowhead" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+          <polygon points="0 0, 8 4, 0 8" fill="#2c3e50" />
+        </marker>
+      </defs>
+    `;
+
+    // Hole das Quell-div und das Ziel-input
+    const sourceDiv = document.getElementById('import-area');
+    const targetInput = document.getElementById('json##id##');
+
+    // Entferne HTML-Tags und hole den reinen Text
+    const cleanText = sourceDiv.innerText;
+
+    // Setze den bereinigten Text als value des input-Elements
+    targetInput.value = cleanText;
+
+    // Initialisierung: JSON aus Input laden
+    window.addEventListener('load', () => {
+      if (jsonInput.value.trim()) {
+        loadFromJSON(jsonInput.value);
+      }
+    });
+
+    // Funktion zum Berechnen des Randpunkts
+    function getBorderPoint(lineStartX, lineStartY, lineEndX, lineEndY, rect, canvasRect) {
+      const dx = lineEndX - lineStartX;
+      const dy = lineEndY - lineStartY;
+      const left = rect.left - canvasRect.left;
+      const top = rect.top - canvasRect.top;
+      const right = left + rect.width;
+      const bottom = top + rect.height;
+      const intersections = [];
+
+      if (dx !== 0) {
+        const t = (left - lineStartX) / dx;
+        if (t > 0 && t <= 1) {
+          const y = lineStartY + t * dy;
+          if (y >= top && y <= bottom) intersections.push({x: left, y, t});
+        }
+      }
+
+      if (dx !== 0) {
+        const t = (right - lineStartX) / dx;
+        if (t > 0 && t <= 1) {
+          const y = lineStartY + t * dy;
+          if (y >= top && y <= bottom) intersections.push({x: right, y, t});
+        }
+      }
+
+      if (dy !== 0) {
+        const t = (top - lineStartY) / dy;
+        if (t > 0 && t <= 1) {
+          const x = lineStartX + t * dx;
+          if (x >= left && x <= right) intersections.push({x, y: top, t});
+        }
+      }
+
+      if (dy !== 0) {
+        const t = (bottom - lineStartY) / dy;
+        if (t > 0 && t <= 1) {
+          const x = lineStartX + t * dx;
+          if (x >= left && x <= right) intersections.push({x, y: bottom, t});
+        }
+      }
+
+      if (intersections.length > 0) {
+        intersections.sort((a, b) => a.t - b.t);
+        return intersections[0];
+      }
+      return {x: lineEndX, y: lineEndY};
     }
 
-    #color-##id## {
-        background-color: #f8f9fa;
-        border-color: #f8f9fa;
+    let mode = 'default';
+
+    // Node erstellen
+    function createNode(x, y, text = 'Neues Konzept', id = null, backgroundColor = 'white') {
+      const node = document.createElement('div');
+      node.className = 'node';
+      node.style.left = x + 'px';
+      node.style.top = y + 'px';
+      node.style.backgroundColor = backgroundColor;
+      node.style.zIndex = '10';
+      node.style.maxWidth = '200px'; 
+      node.style.wordWrap = 'break-word'; // Wortumbruch aktivieren
+      node.style.overflowWrap = 'break-word'; // Zusätzlicher Fallback für Wortumbruch
+      
+      const nodeText = document.createElement('div');
+      nodeText.className = 'node-text';
+      nodeText.textContent = text;
+      nodeText.style.width = '100%'; // Vollbreite nutzen
+      nodeText.style.wordWrap = 'break-word'; // Wortumbruch im Text-Element
+      nodeText.style.overflowWrap = 'break-word';
+      nodeText.style.whiteSpace = 'normal'; // Mehrzeiligen Text erlauben
+      nodeText.style.lineHeight = '1.2'; // Zeilenhöhe für bessere Lesbarkeit
+      nodeText.style.padding = '8px'; // Optional: Padding für bessere Optik
+      node.appendChild(nodeText);
+
+      // "Verbinden"-Button außerhalb des Nodes
+      const connectBtn = document.createElement('button');
+      connectBtn.className = 'node-connect-btn';
+      connectBtn.textContent = '+';
+      connectBtn.title = 'Verbindung erstellen';
+      canvas.appendChild(connectBtn);
+
+      const nodeData = {
+        id: id || nodeIdCounter++,
+        element: node,
+        connectBtn: connectBtn,
+        x: x,
+        y: y,
+        backgroundColor: backgroundColor
+      };
+      
+      nodes.push(nodeData);
+      canvas.appendChild(node);
+
+
     }
-</style>
 
-<div class="main-content" id="fullscreen_mindmap">
-    <h3>##actionsmenu##Mindmap von ##user##</h3>
-    <div class="zoom-controls">
-        <div class="mindmap">
-            <div class="mindmap_buttons">
-                <button type="button" class="btn btn-light toggle-editor-btn" onclick="toggleEditor()"
-                    title="Listenmodus umschalten"><i class="fa-solid fa-list"></i></button>
-                <button type="button" class="btn btn-light" onclick="zoomSvg(1.2)" title="Hineinzoomen"><i
-                        class="fa-solid fa-magnifying-glass-plus"></i></button>
-                <button type="button" class="btn btn-light" onclick="zoomSvg(1/1.2)" title="Herauszoomen"><i
-                        class="fa-solid fa-magnifying-glass-minus"></i></button>
-                <button type="button" class="btn btn-light" onclick="resetZoom()" title="Zoom zurücksetzen"><i
-                        class="fa-solid fa-arrows-to-circle"></i></button>
-                <button type="button" class="btn btn-light toggle-fullscreen-btn" onclick="togglePresentationMode()" title="Präsentationsmodus"><i
-                        class="fa-solid fa-person-chalkboard"></i></button>
-                <div class="dropdown">
-                    <button class="btn btn-light dropdown-toggle" type="button" data-bs-toggle="dropdown"
-                        aria-expanded="false" title="Mindmap exportieren">
-                        <i class="fa-solid fa-file-export"></i>
-                    </button>
-                    <ul class="dropdown-menu">
-                        <li><a class="dropdown-item" href="#" onclick="exportAsSVG()">SVG</a></li>
-                        <li><a class="dropdown-item" href="#" onclick="exportAsHTML()">Interaktives HTML</a></li>
-                        <li><a class="dropdown-item" href="#" onclick="copyMermaidCode()">Mermaid</a></li>
-                    </ul>
-                </div>
-            </div>
-        </div>
-        <p id="color-##id##" style="display: none">[[color_theme]]</p>
-        <div class="editor-panel" style="display: none;">
-            <div id="mindmapEditor" class="mindmap-tree"></div>
-            <div class="export-area" style="display: none;">
-                <strong>Mermaid Code:</strong>
-                <div id="import-area">[[mermaid_text]]</div>
+    
 
-                <input type="text" id="##id##" class="export-input nolink"
-                    placeholder="Use ~ for each indentation level and | to separate nodes" value="">
-            </div>
-        </div>
-        <div class="preview-panel">
-            <div id="mermaidPreview" class="loading">
-                <div id="welcomeMessage">
-                    Klicke auf den Hauptknoten, um zu beginnen 😀...
-                </div>
-                <div id="svgZoomContainer"></div>
-            </div>
-        </div>
-    </div>
+    function createConnection(from, to, label = '', controlX, controlY, id = null) {
+      const conn = {
+        id: id || connectionIdCounter++,
+        from: from.id,
+        to: to.id,
+        label: label,
+        labelElement: null,
+        controlX: controlX,
+        controlY: controlY,
+        isDragging: false
+      };
+      connections.push(conn);
+      renderConnections();
+      saveToJSON();
+    }
 
-    <div id="deleteModal" class="mindmap-modal">
-        <div class="mindmap-modal-content">
-            <h3>Knoten löschen</h3>
-            <p id="deleteModalMessage"></p>
-            <div class="mindmap-modal-buttons" id="deleteModalButtons"></div>
-        </div>
-    </div>
+    // Verbindungen zeichnen
+ function renderConnections() {
+  while (svg.children.length > 1) {
+    svg.removeChild(svg.lastChild);
+  }
 
-    <div id="errorModal" class="mindmap-modal">
-        <div class="mindmap-modal-content">
-            <h3>Fehler</h3>
-            <p id="errorModalMessage"></p>
-            <div class="mindmap-modal-buttons">
-                <button type="button" class="btn btn-primary" onclick="closeErrorModal()">OK</button>
-            </div>
-        </div>
-    </div>
+  connections.forEach(conn => {
+    const fromNode = nodes.find(n => n.id === conn.from);
+    const toNode = nodes.find(n => n.id === conn.to);
+    
+    if (!fromNode || !toNode) return;
 
-    <div id="successModal" class="mindmap-modal">
-        <div class="mindmap-modal-content">
-            <h3>Erfolg</h3>
-            <p id="successModalMessage"></p>
-            <div class="mindmap-modal-buttons">
-                <button type="button" class="btn btn-primary" onclick="closeSuccessModal()">OK</button>
-            </div>
-        </div>
-    </div>
+    const fromRect = fromNode.element.getBoundingClientRect();
+    const toRect = toNode.element.getBoundingClientRect();
+    const canvasRect = canvas.getBoundingClientRect();
 
-    <div id="warningModal" class="mindmap-modal">
-        <div class="mindmap-modal-content">
-            <h3>Warnung</h3>
-            <p id="warningModalMessage"></p>
-            <div class="mindmap-modal-buttons">
-                <button type="button" class="btn btn-primary" onclick="closeWarningModal()">OK</button>
-            </div>
-        </div>
-    </div>
+    const x1 = fromRect.left + fromRect.width / 2 - canvasRect.left;
+    const y1 = fromRect.top + fromRect.height / 2 - canvasRect.top;
+    const x2 = toRect.left + toRect.width / 2 - canvasRect.left;
+    const y2 = toRect.top + toRect.height / 2 - canvasRect.top;
 
-    <script>
-        let BRANCH_COLORS = BRANCH_COLORS_SCHEMES['Standard'].colors;
-        const editor = document.getElementById('mindmapEditor');
-        const previewContainer = document.getElementById('svgZoomContainer');
-        const mermaidInput = document.getElementById('##id##');
-        const welcomeMessage = document.getElementById('welcomeMessage');
+    let startPoint = getBorderPoint(x1, y1, x2, y2, fromRect, canvasRect);
+    if (!startPoint) startPoint = {x: x1, y: y1};
+    let endPoint = getBorderPoint(x2, y2, x1, y1, toRect, canvasRect);
+    if (!endPoint) endPoint = {x: x2, y: y2};
 
-        // Hole das Quell-div und das Ziel-input
-        const sourceDiv = document.getElementById('import-area');
-        const targetInput = document.getElementById('##id##');
+    const startX = startPoint.x;
+    const startY = startPoint.y;
+    const endX = endPoint.x;
+    const endY = endPoint.y;
+    const controlX = conn.controlX;
+    const controlY = conn.controlY;
 
-        // Entferne HTML-Tags und hole den reinen Text
-        const cleanText = sourceDiv.innerText;
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    const d = `M ${startX} ${startY} Q ${controlX} ${controlY} ${endX} ${endY}`;
+    path.setAttribute('d', d);
+    path.setAttribute('class', 'connection');
+    if (selectedConnection === conn) {
+      path.classList.add('selected');
+    }
+    path.addEventListener('click', (e) => {
+      e.stopPropagation();
+      selectConnection(conn);
+    });
+    svg.appendChild(path);
 
-        // Setze den bereinigten Text als value des input-Elements
-        targetInput.value = cleanText;
+    const t = 0.5;
+    const labelX = (1 - t) ** 2 * startX + 2 * (1 - t) * t * controlX + t ** 2 * endX;
+    const labelY = (1 - t) ** 2 * startY + 2 * (1 - t) * t * controlY + t ** 2 * endY;
 
-        // Function for setting the color scheme
-        function setColorScheme() {
-            const colorElement = document.getElementById('color-##id##');
-            let selectedScheme = colorElement && colorElement.innerText.trim() ? colorElement.innerText.trim() : 'Standard';
-
-            if (BRANCH_COLORS_SCHEMES[selectedScheme]) {
-                BRANCH_COLORS = [...BRANCH_COLORS_SCHEMES[selectedScheme].colors];
-            } else {
-                BRANCH_COLORS = [...BRANCH_COLORS_SCHEMES['Standard'].colors];
-            }
-
-            renderEditor();
-            renderMindmap();
+    // Nur Label rendern, wenn es nicht leer ist
+    if (conn.label && conn.label.trim() !== '') {
+      if (!conn.labelElement) {
+        const labelDiv = document.createElement('div');
+        labelDiv.className = 'connection-label';
+        labelDiv.textContent = conn.label;
+        labelDiv.style.left = `${labelX - 50}px`;
+        labelDiv.style.top = `${labelY - 10}px`;
+        canvas.appendChild(labelDiv);
+        conn.labelElement = labelDiv;
+        attachLabelEvents(labelDiv, conn);
+      } else {
+        conn.labelElement.style.left = `${labelX - 50}px`;
+        conn.labelElement.style.top = `${labelY - 10}px`;
+        if (conn.labelElement.tagName === 'DIV') {
+          conn.labelElement.textContent = conn.label;
         }
-
-        // Function to show/hide the editor
-        const toggleEditor = () => {
-            const editorPanel = document.querySelector('.editor-panel');
-            const previewPanel = document.querySelector('.preview-panel');
-            const toggleButton = document.querySelector('.toggle-editor-btn');
-            const zoomButtons = document.querySelectorAll('.zoom-controls .btn.btn-light:not(.toggle-editor-btn)');
-
-            if (editorPanel.style.display === 'none') {
-                editorPanel.style.display = 'block';
-                previewPanel.style.display = 'none';
-                toggleButton.innerHTML = '<i class="fa-solid fa-lightbulb"></i>';
-                zoomButtons.forEach(button => button.style.display = 'none');
-                if (welcomeMessage) welcomeMessage.style.display = 'none';
-            } else {
-                editorPanel.style.display = 'none';
-                previewPanel.style.display = 'block';
-                toggleButton.innerHTML = '<i class="fa-solid fa-list"></i>';
-                zoomButtons.forEach(button => button.style.display = 'inline-block');
-                if (welcomeMessage && !hasInteractedWithRoot && !mindmapData.some(node => node.parent !== null)) {
-                    welcomeMessage.style.display = 'block';
-                }
-            }
-        };
-
-        // Initialization
-        document.addEventListener('DOMContentLoaded', () => {
-            if (!editor || !previewContainer || !mermaidInput || !welcomeMessage) {
-                console.error('Required DOM elements are missing:', {
-                    mindmapEditor: !!editor,
-                    svgZoomContainer: !!previewContainer,
-                    mermaidInput: !!mermaidInput,
-                    welcomeMessage: !!welcomeMessage
-                });
-                showErrorModal('Interner Fehler: Erforderliche DOM-Elemente fehlen. Bitte überprüfen Sie die HTML-Struktur.');
-                mindmapData = [];
-                const defaultRootNode = {
-                    id: nodeCounter++,
-                    text: 'Hauptknoten',
-                    level: 0,
-                    parent: null,
-                    order: 0,
-                    branchIndex: 0
-                };
-                mindmapData.push(defaultRootNode);
-                renderEditor();
-                if (welcomeMessage) welcomeMessage.style.display = 'block';
-                return;
-            }
-            initializeFromMermaidCode();
-            setColorScheme();
-            renderMindmap();
-        });
-
-        // Zoom
-        const zoomSvg = (factor) => {
-            if (!previewContainer) return;
-            currentZoom *= factor;
-            previewContainer.style.transformOrigin = '0 0';
-            previewContainer.style.transform = `scale(${currentZoom})`;
-            document.getElementById('mermaidPreview').style.overflow = 'auto';
-        };
-
-        const resetZoom = () => {
-            if (!previewContainer) return;
-            currentZoom = 1;
-            previewContainer.style.transform = 'none';
-            document.getElementById('mermaidPreview').style.overflow = 'auto';
-        };
-
-        // Export as SVG
-        const exportAsSVG = () => {
-            const svgElement = document.getElementById('mermaidPreview').querySelector('svg');
-            if (!svgElement) return showErrorModal('Keine Mindmap verfügbar. Bitte rendere die Mindmap zuerst.');
-            const svgData = new XMLSerializer().serializeToString(svgElement.cloneNode(true));
-            const svgBlob = new Blob(['<?xml version="1.0" standalone="no"?>\n' + svgData], { type: 'image/svg+xml' });
-            const url = URL.createObjectURL(svgBlob);
-            const downloadLink = document.createElement('a');
-            downloadLink.href = url;
-            downloadLink.download = 'mindmap.svg';
-            document.body.appendChild(downloadLink);
-            downloadLink.click();
-            document.body.removeChild(downloadLink);
-            URL.revokeObjectURL(url);
-            showSuccessModal('Mindmap wurde als SVG exportiert!');
-        };
-
-        // Modified export as HTML (removed zoom buttons)
-        const exportAsHTML = () => {
-            const svgElement = document.getElementById('mermaidPreview').querySelector('svg');
-            if (!svgElement) return showErrorModal('Keine Mindmap verfügbar. Bitte rendere die Mindmap zuerst.');
-
-            const svgData = new XMLSerializer().serializeToString(svgElement.cloneNode(true));
-            const mindmapDataJson = JSON.stringify(mindmapData);
-            const branchColorsJson = JSON.stringify(BRANCH_COLORS);
-            const colorScheme = document.getElementById('color-##id##').innerText.trim() || 'Standard';
-            const colorSchemeJson = JSON.stringify(BRANCH_COLORS_SCHEMES[colorScheme]);
-
-            const htmlContent = `
-<!DOCTYPE html>
-<html lang="de">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mindmap Export</title>
-    <style>
-        body { 
-            margin: 0; 
-            padding: 20px; 
-            display: flex; 
-            flex-direction: column; 
-            align-items: center; 
-            background: #f8f9fa; 
-            font-family: Inter, system-ui, sans-serif;
-        }
-        #svgContainer { 
-            overflow: auto; 
-            max-width: 100%; 
-            max-height: 80vh; 
-        }
-        .node-rect, .node-text { cursor: pointer; }
-    </style>
-</head>
-<body>
-    <div id="svgContainer">${svgData}</div>
-    <script>
-        let mindmapData = ${mindmapDataJson};
-        let BRANCH_COLORS = ${branchColorsJson};
-        let BRANCH_COLORS_SCHEMES = { "${colorScheme}": ${colorSchemeJson} };
-
-        function getContrastTextColor(hexColor) {
-            const r = parseInt(hexColor.slice(1, 3), 16);
-            const g = parseInt(hexColor.slice(3, 5), 16);
-            const b = parseInt(hexColor.slice(5, 7), 16);
-            const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-            return luminance > 0.5 ? '#000000' : '#ffffff';
-        }
-
-        function toggleCollapse(nodeId) {
-            const node = mindmapData.find(n => n.id === nodeId);
-            if (!node || node.level !== 1) return;
-            node.isCollapsed = !node.isCollapsed;
-            renderMindmap();
-        }
-
-        function isNodeVisible(node) {
-            if (node.level === 0) return true;
-            const parent = mindmapData.find(n => n.id === node.parent);
-            if (!parent) return false;
-            if (parent.level === 1 && parent.isCollapsed) return false;
-            return isNodeVisible(parent);
-        }
-
-        function buildTreeFromDataForSVG() {
-            const nodesMap = new Map(mindmapData.map(node => [node.id, { ...node, children: [] }]));
-            let root = null;
-            nodesMap.forEach(node => {
-                if (node.level === 0) root = node;
-                if (node.parent !== null) {
-                    const parent = nodesMap.get(node.parent);
-                    if (parent && (parent.level !== 1 || !parent.isCollapsed)) {
-                        parent.children.push(node);
-                    }
-                }
-            });
-            const sortChildren = node => {
-                node.children.sort((a, b) => (a.order || 0) - (b.order || 0));
-                node.children.forEach(sortChildren);
-            };
-            if (root) sortChildren(root);
-            return root;
-        }
-
-        function assignBranchColors(node) {
-            const colorScheme = BRANCH_COLORS_SCHEMES["${colorScheme}"];
-            node.color = node.level === 0 ? colorScheme.level0 :
-                node.level === 1 ? BRANCH_COLORS[node.branchIndex % BRANCH_COLORS.length] :
-                    node.level === 2 ? BRANCH_COLORS[node.branchIndex % BRANCH_COLORS.length] :
-                        '#ffffff';
-            node.textColor = getContrastTextColor(node.color);
-            node.borderColor = node.level === 0 ? colorScheme.level0 : node.color;
-            node.children.forEach(assignBranchColors);
-        }
-
-        function measureTextWidth(text, fontSize) {
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            ctx.font = \`\${fontSize}px Inter, system-ui, sans-serif\`;
-            return ctx.measureText(text).width;
-        }
-
-        function splitLongWord(word, maxWidth, fontSize) {
-            const chars = word.split('');
-            let current = '';
-            const result = [];
-            chars.forEach(char => {
-                const test = current + char;
-                if (measureTextWidth(test, fontSize) > maxWidth) {
-                    result.push(current);
-                    current = char;
-                } else {
-                    current = test;
-                }
-            });
-            if (current) result.push(current);
-            return result;
-        }
-
-        function calculateSubtreeSize(node) {
-            const fontSize = Math.max(12, 18 - node.level);
-            const maxWidth = 200;
-            const words = node.text.split(' ').flatMap(word => {
-                if (measureTextWidth(word, fontSize) > maxWidth) {
-                    return splitLongWord(word, maxWidth, fontSize);
-                }
-                return word;
-            });
-            let line = '';
-            const lines = [];
-            words.forEach(word => {
-                const testLine = line + word + ' ';
-                if (measureTextWidth(testLine, fontSize) > maxWidth && line.length > 0) {
-                    lines.push(line.trim());
-                    line = word + ' ';
-                } else {
-                    line = testLine;
-                }
-            });
-            if (line.length > 0) lines.push(line.trim());
-            const lineHeight = fontSize * 1.2;
-            node.height = lines.length * lineHeight + 20;
-            node.width = Math.max(100, maxWidth + 20);
-            if (!node.children.length) {
-                node.subtreeWidth = node.width;
-                node.subtreeHeight = node.height;
-                return;
-            }
-            node.children.forEach(calculateSubtreeSize);
-            const spacing = Math.max(10, ...node.children.map(child => child.height * 0.5));
-            node.subtreeHeight = node.children.reduce((sum, child) => sum + child.subtreeHeight, 0) + Math.max(0, node.children.length - 1) * spacing;
-            node.subtreeWidth = node.width + 100 + Math.max(...node.children.map(c => c.subtreeWidth));
-        }
-
-        function positionNode(node, x, y, direction) {
-            if (typeof node.x === 'undefined') {
-                node.x = direction === 'left' ? x - node.width : x;
-            }
-            node.y = y + (node.subtreeHeight - node.height) / 2;
-            const spacing = Math.max(10, ...node.children.map(child => child.height * 0.5));
-            let currentY = y;
-            node.children.sort((a, b) => (a.order || 0) - (b.order || 0));
-            node.children.forEach(child => {
-                const childDirection = child.direction || direction;
-                const offset = 100;
-                const childX = childDirection === 'right' ? node.x + node.width + offset : node.x - offset;
-                positionNode(child, childX, currentY, childDirection);
-                currentY += child.subtreeHeight + spacing;
-            });
-        }
-
-        function calculateLayout(node, level = 0) {
-            if (level === 0) {
-                calculateSubtreeSize(node);
-                let rightChildren = [];
-                let leftChildren = [];
-                node.children.sort((a, b) => (a.order || 0) - (b.order || 0));
-                node.children.forEach((child, index) => {
-                    child.direction = index % 2 === 0 ? 'right' : 'left';
-                    if (child.direction === 'right') rightChildren.push(child);
-                    else leftChildren.push(child);
-                });
-                const spacing = Math.max(10, ...node.children.map(child => child.height * 0.5));
-                let rightTotalHeight = rightChildren.reduce((sum, c) => sum + c.subtreeHeight, 0) + Math.max(0, rightChildren.length - 1) * spacing;
-                let leftTotalHeight = leftChildren.reduce((sum, c) => sum + c.subtreeHeight, 0) + Math.max(0, leftChildren.length - 1) * spacing;
-                let maxTotalHeight = Math.max(leftTotalHeight, rightTotalHeight, node.height);
-                node.x = Math.max(leftTotalHeight, rightTotalHeight) + 100;
-                node.y = maxTotalHeight / 2 - node.height / 2;
-                let rightY = node.y + node.height / 2 - rightTotalHeight / 2;
-                rightChildren.forEach(child => {
-                    positionNode(child, node.x + node.width + 100, rightY, 'right');
-                    rightY += child.subtreeHeight + spacing;
-                });
-                let leftY = node.y + node.height / 2 - leftTotalHeight / 2;
-                leftChildren.forEach(child => {
-                    const rightEdgeX = node.x - 100;
-                    positionNode(child, rightEdgeX, leftY, 'left');
-                    leftY += child.subtreeHeight + spacing;
-                });
-            }
-        }
-
-        function getConnectionPoint(fromNode, toNode) {
-            const fromCenterX = fromNode.x + fromNode.width / 2;
-            const fromCenterY = fromNode.y + fromNode.height / 2;
-            const toCenterX = toNode.x + toNode.width / 2;
-            const toCenterY = toNode.y + toNode.height / 2;
-            const dx = toCenterX - fromCenterX;
-            const dy = toCenterY - fromCenterY;
-            const distance = Math.sqrt(dx * dx + dy * dy);
-            const normalizedDx = dx / distance;
-            const normalizedDy = dy / distance;
-            return {
-                fromX: fromCenterX + normalizedDx * (fromNode.width / 2),
-                fromY: fromCenterY + normalizedDy * (fromNode.height / 2),
-                toX: toCenterX - normalizedDx * (toNode.width / 2),
-                toY: toCenterY - normalizedDy * (toNode.height / 2)
-            };
-        }
-
-        function getBounds(root) {
-            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-            const updateBounds = node => {
-                minX = Math.min(minX, node.x);
-                minY = Math.min(minY, node.y);
-                maxX = Math.max(maxX, node.x + node.width);
-                maxY = Math.max(maxY, node.y + node.height);
-                node.children.forEach(updateBounds);
-            };
-            updateBounds(root);
-            return { minX, minY, maxX, maxY };
-        }
-
-        function generateSVG(root) {
-            if (!root) return '';
-            const padding = 100;
-            assignBranchColors(root);
-            calculateLayout(root);
-            const { minX, minY, maxX, maxY } = getBounds(root);
-            const width = maxX - minX + padding * 2;
-            const height = maxY - minY + padding * 2;
-            let svg = \`<svg width="\${width}" height="\${height}" viewBox="\${minX - padding} \${minY - padding} \${width} \${height}" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">\`;
-            const drawConnections = node => {
-                node.children.forEach(child => {
-                    const { fromX, fromY, toX, toY } = getConnectionPoint(node, child);
-                    svg += \`<line x1="\${fromX}" y1="\${fromY}" x2="\${toX}" y2="\${toY}" stroke="\${BRANCH_COLORS[child.branchIndex % BRANCH_COLORS.length] || '#667eea'}" stroke-width="2" stroke-linecap="round"/>\`;
-                    drawConnections(child);
-                });
-            };
-            const drawNodes = node => {
-                const colorScheme = BRANCH_COLORS_SCHEMES["${colorScheme}"];
-                const { fillColor, fillOpacity, strokeColor, strokeWidth, strokeDasharray } = node.level === 0
-                    ? { fillColor: colorScheme.level0, strokeColor: colorScheme.level0, strokeWidth: 2, strokeDasharray: 'none' }
-                    : node.level === 1
-                        ? { fillColor: BRANCH_COLORS[node.branchIndex % BRANCH_COLORS.length], strokeColor: BRANCH_COLORS[node.branchIndex % BRANCH_COLORS.length], strokeWidth: 2, strokeDasharray: 'none' }
-                        : node.level === 2
-                            ? { fillColor: BRANCH_COLORS[node.branchIndex % BRANCH_COLORS.length], fillOpacity: '0.6', strokeColor: BRANCH_COLORS[node.branchIndex % BRANCH_COLORS.length], strokeWidth: 2, strokeDasharray: '5,3' }
-                            : { fillColor: '#ffffff', strokeColor: BRANCH_COLORS[node.branchIndex % BRANCH_COLORS.length], strokeWidth: 2, strokeDasharray: '5,3' };
-                const textColor = getContrastTextColor(fillColor);
-                const originalNode = mindmapData.find(n => n.id === node.id);
-                const hasChildren = mindmapData.some(n => n.parent === node.id);
-                let collapseIndicator = '';
-                if (node.level === 1 && hasChildren) {
-                    const isCollapsed = originalNode && originalNode.isCollapsed;
-                    const indicatorX = node.x + node.width - 15;
-                    const indicatorY = node.y + 10;
-                    collapseIndicator = \`<text x="\${indicatorX}" y="\${indicatorY}" font-size="12" font-family="Arial, sans-serif" fill="\${textColor}" text-anchor="middle">\${isCollapsed ? '+' : ''}\</text>\`;
-                }
-                svg += \`<rect data-node-id="\${node.id}" class="node-rect" x="\${node.x}" y="\${node.y}" width="\${node.width}" height="\${node.height}" rx="8" fill="\${fillColor}" fill-opacity="\${fillOpacity || '1'}" stroke="\${strokeColor}" stroke-width="\${strokeWidth}" stroke-dasharray="\${strokeDasharray}" style="cursor: \${node.level === 1 && hasChildren ? 'pointer' : 'default'}"/>\`;
-                const words = node.text.split(' ').flatMap(word => {
-                    const fontSize = Math.max(12, 18 - node.level);
-                    if (measureTextWidth(word, fontSize) > 200) {
-                        return splitLongWord(word, 200, fontSize);
-                    }
-                    return word;
-                });
-                let line = '';
-                const lines = [];
-                const maxWidth = 200;
-                const fontSize = Math.max(12, 18 - node.level);
-                words.forEach(word => {
-                    const testLine = line + word + ' ';
-                    if (measureTextWidth(testLine, fontSize) > maxWidth && line.length > 0) {
-                        lines.push(line.trim());
-                        line = word + ' ';
-                    } else {
-                        line = testLine;
-                    }
-                });
-                if (line.length > 0) lines.push(line.trim());
-                const lineHeight = fontSize * 1.2;
-                const totalTextHeight = lines.length * lineHeight;
-                const startY = node.y + (node.height - totalTextHeight) / 2 + lineHeight * 0.7;
-                lines.forEach((textLine, index) => {
-                    svg += \`<text data-node-id="\${node.id}" class="node-text" x="\${node.x + node.width / 2}" y="\${startY + index * lineHeight}" font-size="\${fontSize}" font-family="Inter, system-ui, sans-serif" fill="\${textColor}" text-anchor="middle" font-weight="\${node.level === 0 ? '600' : '400'}" style="cursor: \${node.level === 1 && hasChildren ? 'pointer' : 'default'}">\${textLine}\</text>\`;
-                });
-                svg += collapseIndicator;
-                node.children.forEach(drawNodes);
-            };
-            drawConnections(root);
-            drawNodes(root);
-            svg += '</svg>';
-            return svg;
-        }
-
-        function renderMindmap() {
-            const svgContainer = document.getElementById('svgContainer');
-            svgContainer.innerHTML = '<div>Rendere Mindmap...</div>';
-            try {
-                const root = buildTreeFromDataForSVG();
-                const svg = generateSVG(root);
-                svgContainer.innerHTML = svg;
-                const svgElement = svgContainer.querySelector('svg');
-                svgElement.addEventListener('click', (e) => {
-                    const target = e.target.closest('[data-node-id]');
-                    if (target) {
-                        const nodeId = parseInt(target.getAttribute('data-node-id'));
-                        const node = mindmapData.find(n => n.id === nodeId);
-                        if (node && node.level === 1 && mindmapData.some(n => n.parent === nodeId)) {
-                            toggleCollapse(nodeId);
-                        }
-                    }
-                });
-            } catch (error) {
-                svgContainer.innerHTML = \`<div style="background: #f1f3f4; padding: 20px; border-radius: 12px; border-left: 4px solid #dc2626;">
-                    <h4 style="margin: 0 0 10px 0; color: #dc2626;">⚠️ Vorschau nicht verfügbar</h4>
-                    <p style="color: #6b7280; margin: 0 0 15px 0; font-size: 14px;">Rendering-Fehler: \${error.message}</p>
-                </div>\`;
-            }
-        }
-
-        document.addEventListener('DOMContentLoaded', () => {
-            renderMindmap();
-        });
-    </scr` + `ipt>
-</body>
-</html>
-            `;
-
-            const blob = new Blob([htmlContent], { type: 'text/html' });
-            const url = URL.createObjectURL(blob);
-            const downloadLink = document.createElement('a');
-            downloadLink.href = url;
-            downloadLink.download = 'mindmap.html';
-            document.body.appendChild(downloadLink);
-            downloadLink.click();
-            document.body.removeChild(downloadLink);
-            URL.revokeObjectURL(url);
-            showSuccessModal('Mindmap wurde als HTML exportiert!');
-        };
-
-        // Copy Mermaid Code
-        const copyMermaidCode = () => {
-            const mermaidCode = generateMermaidCode().split('|').map(line => {
-                const match = line.match(/^(~*)[^~]*/);
-                return match ? '  '.repeat(match[1]?.length || 0) + match[0].replace(/^~*/, '') : line;
-            }).join('\n');
-            const textarea = document.createElement('textarea');
-            textarea.value = mermaidCode;
-            document.body.appendChild(textarea);
-            textarea.select();
-            try {
-                document.execCommand('copy');
-                showSuccessModal('Mermaid-Code wurde in die Zwischenablage kopiert!');
-            } catch (err) {
-                showErrorModal('Fehler beim Kopieren des Codes in die Zwischenablage.');
-            }
-            document.body.removeChild(textarea);
-        };
-
-        // Node validation
-        const validateNodeText = (text, inputElement) => {
-            if (!text.trim()) {
-                showErrorModal('Die Eingabe darf nicht leer sein.');
-                inputElement?.focus();
-                return false;
-            }
-            if (text.length > MAX_TEXT_LENGTH) {
-                showErrorModal(`Die Eingabe darf maximal ${MAX_TEXT_LENGTH} Zeichen lang sein.`);
-                inputElement?.focus();
-                return false;
-            }
-            if (/<[a-zA-Z0-9\s="/]*(>|\/>|on[a-zA-Z]+=["'])|[|~<>]/i.test(text)) {
-                showErrorModal('Die Eingabe darf keinen HTML-Code, Skripte, "|", "~", "<" oder ">" enthalten.');
-                inputElement?.focus();
-                return false;
-            }
-            return true;
-        };
-
-        // Real-time input validation for SVG overlay
-        const validateInputLength = (inputElement, nodeId) => {
-            let text = inputElement.value;
-            if (text.length > MAX_TEXT_LENGTH) {
-                showErrorModal(`Die Eingabe darf maximal ${MAX_TEXT_LENGTH} Zeichen lang sein.`);
-                inputElement.value = text.slice(0, MAX_TEXT_LENGTH);
-                inputElement.focus();
-            }
-            if (/<[a-zA-Z0-9\s="/]*(>|\/>|on[a-zA-Z]+=["'])|[|~<>]/i.test(text)) {
-                showErrorModal('Die Eingabe darf keinen HTML-Code, Skripte, "|", "~", "<" oder ">" enthalten.');
-                inputElement.value = text.replace(/[<|~>]/g, '');
-                inputElement.focus();
-            }
-        };
-
-        // Initializes mind map data from Mermaid code
-        function initializeFromMermaidCode() {
-            if (!mermaidInput) {
-                console.error('Element with ID "##id##" not found in the DOM.');
-                showErrorModal('Interner Fehler: Das Eingabefeld für den Mermaid-Code wurde nicht gefunden.');
-                mindmapData = [];
-                const defaultRootNode = {
-                    id: nodeCounter++,
-                    text: 'Hauptknoten',
-                    level: 0,
-                    parent: null,
-                    order: 0,
-                    branchIndex: 0
-                };
-                mindmapData.push(defaultRootNode);
-                renderEditor();
-                if (welcomeMessage) welcomeMessage.style.display = 'block';
-                return;
-            }
-
-            const codeInput = mermaidInput.value;
-            const lines = codeInput.split('|').map(line => line.trimEnd()).filter(line => line.trim().length > 0);
-
-            mindmapData = [];
-            let levelMap = {};
-            let branchIndexCounter = 0;
-
-            if (!codeInput.trim() || lines.length === 0 || (lines.length === 1 && lines[0].trim() === 'mindmap')) {
-                const defaultRootNode = {
-                    id: nodeCounter++,
-                    text: 'Hauptknoten',
-                    level: 0,
-                    parent: null,
-                    order: 0,
-                    branchIndex: 0
-                };
-                mindmapData.push(defaultRootNode);
-                mermaidInput.value = 'mindmap|root(Hauptknoten)';
-                renderEditor();
-                if (welcomeMessage) welcomeMessage.style.display = 'block';
-                return;
-            }
-
-            if (!lines[0] || lines[0].trim() !== 'mindmap') {
-                lines.unshift('mindmap');
-            }
-
-            lines.forEach((line, index) => {
-                if (line.trim() === 'mindmap') return;
-
-                const match = line.match(/^(~*)[^~]*/);
-                if (!match) return;
-                const level = match[1] ? match[1].length : 0;
-                const textWithIndent = match[0];
-
-                if (level > MAX_LEVEL) return;
-
-                let parentId = null;
-                if (level > 0) {
-                    for (let i = level - 1; i >= 0; i--) {
-                        if (levelMap[i] !== undefined) {
-                            parentId = levelMap[i];
-                            break;
-                        }
-                    }
-                }
-
-                if (parentId !== null) {
-                    const childrenCount = mindmapData.filter(node => node.parent === parentId).length;
-                    if (childrenCount >= MAX_CHILDREN_PER_NODE) return;
-                }
-
-                let text = textWithIndent.replace(/^~*/, '').trim();
-                if (text.startsWith('root(') && text.endsWith(')')) {
-                    text = text.slice(5, -1);
-                }
-
-                if (!validateNodeText(text)) return;
-
-                const siblings = mindmapData.filter(n => n.parent === parentId);
-                const order = siblings.length;
-
-                const branchIndex = level === 0 ? 0 :
-                    level === 1 ? branchIndexCounter++ :
-                        mindmapData.find(n => n.id === parentId)?.branchIndex || 0;
-
-                const newNode = {
-                    id: nodeCounter++,
-                    text: text,
-                    level: level,
-                    parent: parentId,
-                    order: order,
-                    branchIndex: branchIndex
-                };
-
-                mindmapData.push(newNode);
-                levelMap[level] = newNode.id;
-
-                Object.keys(levelMap).forEach(key => {
-                    if (parseInt(key) > level) {
-                        delete levelMap[key];
-                    }
-                });
-            });
-
-            if (mindmapData.length === 0) {
-                const defaultRootNode = {
-                    id: nodeCounter++,
-                    text: 'Hauptknoten',
-                    level: 0,
-                    parent: null,
-                    order: 0,
-                    branchIndex: 0
-                };
-                mindmapData.push(defaultRootNode);
-                mermaidInput.value = 'mindmap|root(Hauptknoten)';
-                if (welcomeMessage) welcomeMessage.style.display = 'block';
-            } else if (welcomeMessage && !mindmapData.some(node => node.parent !== null)) {
-                welcomeMessage.style.display = 'block';
-            } else if (welcomeMessage) {
-                welcomeMessage.style.display = 'none';
-            }
-
-            renderEditor();
-        }
-
-        // Collapse/expand function for Level 1 nodes
-        const toggleCollapse = (nodeId) => {
-            const node = mindmapData.find(n => n.id === nodeId);
-            if (!node || node.level !== 1) return;
-            node.isCollapsed = !node.isCollapsed;
-            renderEditor();
-            renderMindmap();
-        };
-
-        // Checks whether a node is visible based on the isCollapsed state
-        const isNodeVisible = (node) => {
-            if (node.level === 0) return true;
-            const parent = mindmapData.find(n => n.id === node.parent);
-            if (!parent) return false;
-            if (parent.level === 1 && parent.isCollapsed) return false;
-            return isNodeVisible(parent);
-        };
-
-        // Node and editor rendering
-        const getSortedNodes = () => {
-            const nodes = [];
-            const rootNodes = mindmapData.filter(node => node.level === 0).sort((a, b) => a.order - b.order);
-            const addNodeAndChildren = node => {
-                if (!isNodeVisible(node)) return;
-                nodes.push(node);
-                if (node.level === 1 && node.isCollapsed) return;
-                mindmapData.filter(child => child.parent === node.id)
-                    .sort((a, b) => (a.order || 0) - (b.order || 0))
-                    .forEach(addNodeAndChildren);
-            };
-            rootNodes.forEach(addNodeAndChildren);
-            return nodes;
-        };
-
-        const renderEditor = () => {
-            if (!editor) return;
-            editor.innerHTML = '';
-            const sortedNodes = getSortedNodes();
-
-            sortedNodes.forEach((node, index) => {
-                const nodeDiv = document.createElement('div');
-                nodeDiv.className = 'node';
-                nodeDiv.dataset.nodeId = node.id;
-                nodeDiv.dataset.index = index;
-                nodeDiv.dataset.level = node.level;
-                nodeDiv.draggable = false;
-
-                const parent = node.level > 0 ? mindmapData.find(n => n.id === node.parent) : null;
-                node.branchIndex = node.level === 0 ? 0 :
-                    node.level === 1 ? mindmapData.filter(n => n.parent === node.parent).sort((a, b) => (a.order || 0) - (b.order || 0)).indexOf(node) :
-                        parent ? parent.branchIndex : 0;
-
-                const collapseIcon = node.level === 1 ? `<span class="collapse-icon" onclick="toggleCollapse(${node.id})" title="${node.isCollapsed ? 'Ast ausklappen' : 'Ast einklappen'}">${node.isCollapsed ? '<i class="fa-solid fa-chevron-right"></i>' : '<i class="fa-solid fa-chevron-down"></i>'}</span>` : '';
-                const addButton = node.level < MAX_LEVEL ? `` : '';
-                const indent = node.level > 1 ? `<span class="indent">${'　'.repeat(node.level * 2)}</span>` : '';
-
-                const colorElement = document.getElementById('color-##id##');
-                let selectedScheme = colorElement && colorElement.innerText.trim() ? colorElement.innerText.trim() : 'Standard';
-                const colorScheme = BRANCH_COLORS_SCHEMES[selectedScheme] || BRANCH_COLORS_SCHEMES['Standard'];
-                const inputBackgroundColor = node.level === 0 ? colorScheme.level0 :
-                    node.level === 1 ? BRANCH_COLORS[node.branchIndex % BRANCH_COLORS.length] :
-                        node.level === 2 ? BRANCH_COLORS[node.branchIndex % BRANCH_COLORS.length] :
-                            '#ffffff';
-                const textColor = getContrastTextColor(inputBackgroundColor);
-
-                nodeDiv.innerHTML = `
-                    ${indent}
-                    ${collapseIcon}
-                    ${addButton}
-                    <input type="text" class="node-input" value="${node.text}" 
-                           style="background-color: ${inputBackgroundColor}; color: ${textColor};"
-                           oninput="validateInputLength(this, ${node.id})"
-                           onchange="updateNodeText(${node.id}, this.value, this)"
-                           placeholder="Knotenbeschriftung eingeben" 
-                           draggable="false" 
-                           data-node-id="${node.id}">
-                `;
-
-                const inputElement = nodeDiv.querySelector('.node-input');
-                let isDragging = false;
-
-                inputElement.addEventListener('mousedown', e => {
-                    e.stopPropagation();
-                    isDragging = false;
-                    const input = e.target;
-                    const rect = input.getBoundingClientRect();
-                    const clickX = e.clientX - rect.left;
-                    const ctx = document.createElement('canvas').getContext('2d');
-                    ctx.font = window.getComputedStyle(input).fontSize + ' ' + window.getComputedStyle(input).fontFamily;
-                    const text = input.value;
-                    let bestPosition = 0;
-                    for (let i = 0; i <= text.length; i++) {
-                        if (ctx.measureText(text.substring(0, i)).width + 10 >= clickX) {
-                            bestPosition = i;
-                            break;
-                        }
-                        bestPosition = i;
-                    }
-                    setTimeout(() => !isDragging && input.setSelectionRange(bestPosition, bestPosition), 0);
-                });
-
-                inputElement.addEventListener('click', e => {
-                    e.stopPropagation();
-                    if (isDragging) return e.preventDefault();
-                    const input = e.target;
-                    setTimeout(() => {
-                        const rect = input.getBoundingClientRect();
-                        if ((e.clientX - rect.left) > (rect.width - 20) * 0.9) {
-                            input.setSelectionRange(input.value.length, input.value.length);
-                        }
-                    }, 10);
-                });
-
-                inputElement.addEventListener('keydown', e => (e.key === 'Enter' || e.keyCode === 13) && e.preventDefault() && e.target.blur());
-
-                editor.appendChild(nodeDiv);
-            });
-        };
-
-        // Help functions for node structure
-        const getMaxDepth = nodeId => {
-            const node = mindmapData.find(n => n.id === nodeId);
-            if (!node) return 0;
-            const children = mindmapData.filter(n => n.parent === nodeId);
-            return children.length ? Math.max(...children.map(child => 1 + getMaxDepth(child.id))) : 0;
-        };
-
-        const isDescendant = (ancestorId, nodeId) => {
-            const node = mindmapData.find(n => n.id === nodeId);
-            if (!node || node.parent === null) return false;
-            return node.parent === ancestorId || isDescendant(ancestorId, node.parent);
-        };
-
-        const updateChildrenLevels = (nodeId, newLevel) => {
-            mindmapData.filter(n => n.parent === nodeId).forEach(child => {
-                child.level = newLevel + 1;
-                child.branchIndex = mindmapData.find(n => n.id === nodeId).branchIndex;
-                child.isCollapsed = child.level === 1 ? false : undefined;
-                updateChildrenLevels(child.id, child.level);
-            });
-        };
-
-        const normalizeOrders = () => {
-            const groups = {};
-            mindmapData.forEach(node => {
-                const key = node.parent === null ? 'root' : node.parent;
-                groups[key] = groups[key] || [];
-                groups[key].push(node);
-            });
-            Object.values(groups).forEach(group => {
-                group.sort((a, b) => (a.order || 0) - (b.order || 0) || a.id - b.id)
-                    .forEach((node, index) => node.order = index + 1000);
-            });
-        };
-
-        // Mermaid and SVG generation
-        const generateMermaidCode = () => {
-            if (!mindmapData.length) return 'mindmap|root(Hauptknoten)';
-            const rootNode = mindmapData.find(node => node.level === 0);
-            if (!rootNode) return 'mindmap|root(Hauptknoten)';
-            const addNodeToMermaid = (node, level = 0) => {
-                const indent = '~'.repeat(level);
-                const text = node.text.replace(/[]/g, '');
-                let nodeCode = node.level === 0 ? `${indent}root(${text})` : `${indent}${text}`;
-                const children = mindmapData.filter(child => child.parent === node.id).sort((a, b) => (a.order || 0) - (b.order || 0));
-                return nodeCode + children.map(child => '|' + addNodeToMermaid(child, level + 1)).join('');
-            };
-            return 'mindmap|' + addNodeToMermaid(rootNode);
-        };
-
-        const buildTreeFromData = () => {
-            const nodesMap = new Map(mindmapData.map(node => [node.id, { ...node, children: [] }]));
-            let root = null;
-            nodesMap.forEach(node => {
-                if (node.level === 0) root = node;
-                if (node.parent !== null) {
-                    const parent = nodesMap.get(node.parent);
-                    if (parent) parent.children.push(node);
-                }
-            });
-            const sortChildren = node => {
-                node.children.sort((a, b) => (a.order || 0) - (b.order || 0));
-                node.children.forEach(sortChildren);
-            };
-            if (root) sortChildren(root);
-            return root;
-        };
-
-        const assignBranchColors = node => {
-            const colorElement = document.getElementById('color-##id##');
-            let selectedScheme = colorElement && colorElement.innerText.trim() ? colorElement.innerText.trim() : 'Standard';
-            const colorScheme = BRANCH_COLORS_SCHEMES[selectedScheme] || BRANCH_COLORS_SCHEMES['Standard'];
-            node.color = node.level === 0 ? colorScheme.level0 :
-                node.level === 1 ? BRANCH_COLORS[node.branchIndex % BRANCH_COLORS.length] :
-                    node.level === 2 ? BRANCH_COLORS[node.branchIndex % BRANCH_COLORS.length] :
-                        '#ffffff';
-            node.textColor = getContrastTextColor(node.color);
-            node.borderColor = node.level === 0 ? colorScheme.level0 : node.color;
-            node.children.forEach(assignBranchColors);
-        };
-
-        const countNodes = node => 1 + node.children.reduce((sum, child) => sum + countNodes(child), 0);
-
-        const calculateSubtreeSize = (node) => {
-            const fontSize = Math.max(12, 18 - node.level);
-            const maxWidth = 200;
-            const words = node.text.split(' ').flatMap(word => {
-                if (measureTextWidth(word, fontSize) > maxWidth) {
-                    return splitLongWord(word, maxWidth, fontSize);
-                }
-                return word;
-            });
-            let line = '';
-            const lines = [];
-            words.forEach(word => {
-                const testLine = line + word + ' ';
-                if (measureTextWidth(testLine, fontSize) > maxWidth && line.length > 0) {
-                    lines.push(line.trim());
-                    line = word + ' ';
-                } else {
-                    line = testLine;
-                }
-            });
-            if (line.length > 0) lines.push(line.trim());
-            const lineHeight = fontSize * 1.2;
-            node.height = lines.length * lineHeight + 20;
-            node.width = Math.max(100, maxWidth + 20);
-            if (!node.children.length) {
-                node.subtreeWidth = node.width;
-                node.subtreeHeight = node.height;
-                return;
-            }
-            node.children.forEach(calculateSubtreeSize);
-            const spacing = Math.max(10, ...node.children.map(child => child.height * 0.5));
-            node.subtreeHeight = node.children.reduce((sum, child) => sum + child.subtreeHeight, 0) + Math.max(0, node.children.length - 1) * spacing;
-            node.subtreeWidth = node.width + 100 + Math.max(...node.children.map(c => c.subtreeWidth));
-        };
-
-        const positionNode = (node, x, y, direction) => {
-            if (typeof node.x === 'undefined') {
-                node.x = direction === 'left' ? x - node.width : x;
-            }
-            node.y = y + (node.subtreeHeight - node.height) / 2;
-            const spacing = Math.max(10, ...node.children.map(child => child.height * 0.5));
-            let currentY = y;
-            node.children.sort((a, b) => (a.order || 0) - (b.order || 0));
-            node.children.forEach(child => {
-                const childDirection = child.direction || direction;
-                const offset = 100;
-                const childX = childDirection === 'right' ? node.x + node.width + offset : node.x - offset;
-                positionNode(child, childX, currentY, childDirection);
-                currentY += child.subtreeHeight + spacing;
-            });
-        };
-
-        const calculateLayout = (node, level = 0) => {
-            if (level === 0) {
-                calculateSubtreeSize(node);
-                let rightChildren = [];
-                let leftChildren = [];
-                node.children.sort((a, b) => (a.order || 0) - (b.order || 0));
-                node.children.forEach((child, index) => {
-                    child.direction = index % 2 === 0 ? 'right' : 'left';
-                    if (child.direction === 'right') rightChildren.push(child);
-                    else leftChildren.push(child);
-                });
-                const spacing = Math.max(10, ...node.children.map(child => child.height * 0.5));
-                let rightTotalHeight = rightChildren.reduce((sum, c) => sum + c.subtreeHeight, 0) + Math.max(0, rightChildren.length - 1) * spacing;
-                let leftTotalHeight = leftChildren.reduce((sum, c) => sum + c.subtreeHeight, 0) + Math.max(0, leftChildren.length - 1) * spacing;
-                let maxTotalHeight = Math.max(leftTotalHeight, rightTotalHeight, node.height);
-                node.x = Math.max(leftTotalHeight, rightTotalHeight) + 100;
-                node.y = maxTotalHeight / 2 - node.height / 2;
-                let rightY = node.y + node.height / 2 - rightTotalHeight / 2;
-                rightChildren.forEach(child => {
-                    positionNode(child, node.x + node.width + 100, rightY, 'right');
-                    rightY += child.subtreeHeight + spacing;
-                });
-                let leftY = node.y + node.height / 2 - leftTotalHeight / 2;
-                leftChildren.forEach(child => {
-                    const rightEdgeX = node.x - 100;
-                    positionNode(child, rightEdgeX, leftY, 'left');
-                    leftY += child.subtreeHeight + spacing;
-                });
-            }
-        };
-
-        const getConnectionPoint = (fromNode, toNode) => {
-            const fromCenterX = fromNode.x + fromNode.width / 2;
-            const fromCenterY = fromNode.y + fromNode.height / 2;
-            const toCenterX = toNode.x + toNode.width / 2;
-            const toCenterY = toNode.y + toNode.height / 2;
-            const dx = toCenterX - fromCenterX;
-            const dy = toCenterY - fromCenterY;
-            const distance = Math.sqrt(dx * dx + dy * dy);
-            const normalizedDx = dx / distance;
-            const normalizedDy = dy / distance;
-            return {
-                fromX: fromCenterX + normalizedDx * (fromNode.width / 2),
-                fromY: fromCenterY + normalizedDy * (fromNode.height / 2),
-                toX: toCenterX - normalizedDx * (toNode.width / 2),
-                toY: toCenterY - normalizedDy * (toNode.height / 2)
-            };
-        };
-
-        const buildTreeFromDataForSVG = () => {
-            const nodesMap = new Map(mindmapData.map(node => [node.id, { ...node, children: [] }]));
-            let root = null;
-            nodesMap.forEach(node => {
-                if (node.level === 0) root = node;
-                if (node.parent !== null) {
-                    const parent = nodesMap.get(node.parent);
-                    if (parent && (parent.level !== 1 || !parent.isCollapsed)) {
-                        parent.children.push(node);
-                    }
-                }
-            });
-            const sortChildren = node => {
-                node.children.sort((a, b) => (a.order || 0) - (b.order || 0));
-                node.children.forEach(sortChildren);
-            };
-            if (root) sortChildren(root);
-            return root;
-        };
-
-        const generateSVG = root => {
-            if (!root) return '';
-            const padding = 100;
-            assignBranchColors(root);
-            calculateLayout(root);
-            const { minX, minY, maxX, maxY } = getBounds(root);
-            const width = maxX - minX + padding * 2;
-            const height = maxY - minY + padding * 2;
-            let svg = `<svg width="${width}" height="${height}" viewBox="${minX - padding} ${minY - padding} ${width} ${height}" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">`;
-            const drawConnections = node => {
-                node.children.forEach(child => {
-                    const { fromX, fromY, toX, toY } = getConnectionPoint(node, child);
-                    svg += `<line x1="${fromX}" y1="${fromY}" x2="${toX}" y2="${toY}" stroke="${BRANCH_COLORS[child.branchIndex % BRANCH_COLORS.length] || '#667eea'}" stroke-width="2" stroke-linecap="round"/>`;
-                    drawConnections(child);
-                });
-            };
-            const drawNodes = node => {
-                const colorElement = document.getElementById('color-##id##');
-                let selectedScheme = colorElement && colorElement.innerText.trim() ? colorElement.innerText.trim() : 'Standard';
-                const colorScheme = BRANCH_COLORS_SCHEMES[selectedScheme] || BRANCH_COLORS_SCHEMES['Standard'];
-                const { fillColor, fillOpacity, strokeColor, strokeWidth, strokeDasharray } = node.level === 0
-                    ? { fillColor: colorScheme.level0, strokeColor: colorScheme.level0, strokeWidth: 2, strokeDasharray: 'none' }
-                    : node.level === 1
-                        ? { fillColor: BRANCH_COLORS[node.branchIndex % BRANCH_COLORS.length], strokeColor: BRANCH_COLORS[node.branchIndex % BRANCH_COLORS.length], strokeWidth: 2, strokeDasharray: 'none' }
-                        : node.level === 2
-                            ? { fillColor: BRANCH_COLORS[node.branchIndex % BRANCH_COLORS.length], fillOpacity: '0.6', strokeColor: BRANCH_COLORS[node.branchIndex % BRANCH_COLORS.length], strokeWidth: 2, strokeDasharray: '5,3' }
-                            : { fillColor: '#ffffff', strokeColor: BRANCH_COLORS[node.branchIndex % BRANCH_COLORS.length], strokeWidth: 2, strokeDasharray: '5,3' };
-                const textColor = getContrastTextColor(fillColor);
-                const originalNode = mindmapData.find(n => n.id === node.id);
-                const hasChildren = mindmapData.some(n => n.parent === node.id);
-                let collapseIndicator = '';
-                if (node.level === 1 && hasChildren) {
-                    const isCollapsed = originalNode && originalNode.isCollapsed;
-                    const indicatorX = node.x + node.width - 15;
-                    const indicatorY = node.y + 10;
-                    collapseIndicator = `<text x="${indicatorX}" y="${indicatorY}" font-size="12" font-family="Arial, sans-serif" fill="${textColor}" text-anchor="middle">${isCollapsed ? '+' : ''}</text>`;
-                }
-                svg += `<rect data-node-id="${node.id}" class="node-rect" x="${node.x}" y="${node.y}" width="${node.width}" height="${node.height}" rx="8" fill="${fillColor}" fill-opacity="${fillOpacity || '1'}" stroke="${strokeColor}" stroke-width="${strokeWidth}" stroke-dasharray="${strokeDasharray}" style="cursor: ${node.level === 1 && hasChildren ? 'pointer' : 'default'}"/>`;
-                const words = node.text.split(' ').flatMap(word => {
-                    const fontSize = Math.max(12, 18 - node.level);
-                    if (measureTextWidth(word, fontSize) > 200) {
-                        return splitLongWord(word, 200, fontSize);
-                    }
-                    return word;
-                });
-                let line = '';
-                const lines = [];
-                const maxWidth = 200;
-                const fontSize = Math.max(12, 18 - node.level);
-                words.forEach(word => {
-                    const testLine = line + word + ' ';
-                    if (measureTextWidth(testLine, fontSize) > maxWidth && line.length > 0) {
-                        lines.push(line.trim());
-                        line = word + ' ';
-                    } else {
-                        line = testLine;
-                    }
-                });
-                if (line.length > 0) lines.push(line.trim());
-                const lineHeight = fontSize * 1.2;
-                const totalTextHeight = lines.length * lineHeight;
-                const startY = node.y + (node.height - totalTextHeight) / 2 + lineHeight * 0.7;
-                lines.forEach((textLine, index) => {
-                    svg += `<text data-node-id="${node.id}" class="node-text" x="${node.x + node.width / 2}" y="${startY + index * lineHeight}" font-size="${fontSize}" font-family="Inter, system-ui, sans-serif" fill="${textColor}" text-anchor="middle" font-weight="${node.level === 0 ? '600' : '400'}" style="cursor: ${node.level === 1 && hasChildren ? 'pointer' : 'default'}">${textLine}</text>`;
-                });
-                svg += collapseIndicator;
-                node.children.forEach(drawNodes);
-            };
-            drawConnections(root);
-            drawNodes(root);
-            svg += '</svg>';
-            return svg;
-        };
-
-        const getBounds = root => {
-            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-            const updateBounds = node => {
-                minX = Math.min(minX, node.x);
-                minY = Math.min(minY, node.y);
-                maxX = Math.max(maxX, node.x + node.width);
-                maxY = Math.max(maxY, node.y + node.height);
-                node.children.forEach(updateBounds);
-            };
-            updateBounds(root);
-            return { minX, minY, maxX, maxY };
-        };
-
-        const renderMindmap = () => {
-            if (!mermaidInput) return;
-            mermaidInput.value = generateMermaidCode();
-            if (!previewContainer) return;
-            previewContainer.innerHTML = '<div class="loading">Rendere Mindmap...</div>';
-            try {
-                const root = buildTreeFromDataForSVG();
-                const svg = generateSVG(root);
-                previewContainer.innerHTML = `<div id="mermaid-container-${Date.now()}" class="mermaid-container">${svg}</div>`;
-                const existingOverlay = document.querySelector('.node-action-overlay, .input-overlay');
-                if (existingOverlay) existingOverlay.remove();
-                const svgContainer = previewContainer.querySelector('svg');
-                if (svgContainer) {
-                    svgContainer.addEventListener('click', (e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        const existingOverlay = document.querySelector('.node-action-overlay, .input-overlay');
-                        if (existingOverlay) existingOverlay.remove();
-                        const target = e.target.closest('[data-node-id]');
-                        if (target) {
-                            const nodeId = parseInt(target.getAttribute('data-node-id'));
-                            const node = mindmapData.find(n => n.id === nodeId);
-                            if (!node) {
-                                showErrorModal('Knoten nicht gefunden.');
-                                return;
-                            }
-                            if (node.level === 1 && mindmapData.some(n => n.parent === nodeId)) {
-                                toggleCollapse(nodeId);
-                                return;
-                            }
-                            // Additional click handling for node actions can be added here
-                        }
-                    });
-                }
-                if (welcomeMessage && !hasInteractedWithRoot && !mindmapData.some(node => node.parent !== null)) {
-                    welcomeMessage.style.display = 'block';
-                } else if (welcomeMessage) {
-                    welcomeMessage.style.display = 'none';
-                }
-            } catch (error) {
-                const mermaidCode = mermaidInput.value.split('|').map(line => {
-                    const match = line.match(/^(~*)[^~]*/);
-                    return match ? ' '.repeat(match[1]?.length || 0) + match[0].replace(/^~*/, '') : line;
-                }).join('\n');
-                previewContainer.innerHTML = `
-                    <div style="background: #f1f3f4; padding: 20px; border-radius: 12px; border-left: 4px solid #dc2626;">
-                        <h4 style="margin: 0 0 10px 0; color: #dc2626;">⚠️ Vorschau nicht verfügbar</h4>
-                        <p style="color: #6b7280; margin: 0 0 15px 0; font-size: 14px;">Rendering-Fehler: ${error.message}</p>
-                        <h5 style="margin: 15px 0 10px 0; color: #1f2937;">📋 Generierter Code:</h5>
-                        <pre style="background: white; padding: 15px; border-radius: 8px; font-family: 'Courier New', monospace; font-size: 13px; line-height: 1.4; overflow-x: auto; margin: 0; border: 1px solid #e5e7eb;">${mermaidCode}</pre>
-                    </div>
-                `;
-                if (welcomeMessage) welcomeMessage.style.display = 'none';
-            }
-        };
-
-       
-
-        // Event Listener: ESC oder anderes Beenden des Vollbildes
-        document.addEventListener("fullscreenchange", () => {
-            const isFullscreen = document.fullscreenElement ||
-                document.webkitFullscreenElement ||
-                document.msFullscreenElement;
-
-            if (!isFullscreen) {
-                // **Seite neu laden**, um Dropdown-Probleme zu vermeiden
-                location.reload();
-            }
-        });
-
-function togglePresentationMode() {
-    const fsContainer = document.getElementById("fullscreen_mindmap");
-    const previewPanel = document.querySelector('.preview-panel');
-    const toggleButton = document.querySelector('.toggle-fullscreen-btn');
-
-    if (fsContainer.classList.contains('fullscreen-mode')) {
-        // Modus beenden
-        fsContainer.classList.remove('fullscreen-mode');
-        previewPanel.style.overflow = 'auto'; //
-        // Optionale: Zoom resetten, falls nötig
-        resetZoom();
+      }
     } else {
-        // Modus starten
-        fsContainer.classList.add('fullscreen-mode');
-        previewPanel.style.overflow = 'hidden'; // Verhindere Scrollbars im Modus
-     }
+      // Entferne vorhandenes labelElement, falls es existiert
+      if (conn.labelElement) {
+        conn.labelElement.remove();
+        conn.labelElement = null;
+      }
+    }
+  });
 }
 
-document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && document.getElementById("fullscreen_mindmap").classList.contains('fullscreen-mode')) {
-        togglePresentationMode();
+    function selectConnection(conn) {
+      selectedConnection = conn;
+      if (selectedNode) {
+        selectedNode.element.classList.remove('selected');
+        selectedNode.connectBtn.style.display = 'none';
+        selectedNode = null;
+      }
+      renderConnections();
     }
-});
 
-    </script>
-</div>
+   // Hilfsfunktion für Textumbruch im SVG
+function wrapSVGText(text, maxWidth, fontSize, lineHeight, ctx) {
+  const words = text.split(' ');
+  const lines = [];
+  let currentLine = '';
+  
+  words.forEach(word => {
+    const testLine = currentLine + (currentLine ? ' ' : '') + word;
+    const metrics = ctx.measureText(testLine);
+    if (metrics.width > maxWidth) {
+      if (currentLine) lines.push(currentLine);
+      currentLine = word;
+    } else {
+      currentLine = testLine;
+    }
+  });
+  if (currentLine) lines.push(currentLine);
+  
+  return lines;
+}
+
+// SVG Export Funktion
+function exportToSVG() {
+  if (nodes.length === 0 && connections.length === 0) {
+    alert('Nichts zu exportieren.');
+    return;
+  }
+
+  // Temporäres Canvas für genaue Textmessung erstellen
+  const measureCanvas = document.createElement('canvas');
+  const measureCtx = measureCanvas.getContext('2d');
+  measureCtx.font = '14px Arial, sans-serif'; // Passe an die Font im SVG an
+
+  const canvasRect = canvas.getBoundingClientRect();
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+
+  // Bounding Box für Nodes berechnen
+  nodes.forEach(node => {
+    const rect = node.element.getBoundingClientRect();
+    const x = rect.left - canvasRect.left;
+    const y = rect.top - canvasRect.top;
+    minX = Math.min(minX, x);
+    minY = Math.min(minY, y);
+    maxX = Math.max(maxX, x + rect.width);
+    maxY = Math.max(maxY, y + rect.height);
+  });
+
+  // Bounding Box für Connections und Labels berechnen
+  connections.forEach(conn => {
+    const fromNode = nodes.find(n => n.id === conn.from);
+    const toNode = nodes.find(n => n.id === conn.to);
+    
+    if (!fromNode || !toNode) return;
+
+    const fromRect = fromNode.element.getBoundingClientRect();
+    const toRect = toNode.element.getBoundingClientRect();
+
+    const x1 = fromRect.left + fromRect.width / 2 - canvasRect.left;
+    const y1 = fromRect.top + fromRect.height / 2 - canvasRect.top;
+    const x2 = toRect.left + toRect.width / 2 - canvasRect.left;
+    const y2 = toRect.top + toRect.height / 2 - canvasRect.top;
+
+    let startPoint = getBorderPoint(x1, y1, x2, y2, fromRect, canvasRect) || {x: x1, y: y1};
+    let endPoint = getBorderPoint(x2, y2, x1, y1, toRect, canvasRect) || {x: x2, y: y2};
+
+    const startX = startPoint.x;
+    const startY = startPoint.y;
+    const endX = endPoint.x;
+    const endY = endPoint.y;
+    const controlX = conn.controlX;
+    const controlY = conn.controlY;
+
+    minX = Math.min(minX, startX, controlX, endX);
+    minY = Math.min(minY, startY, controlY, endY);
+    maxX = Math.max(maxX, startX, controlX, endX);
+    maxY = Math.max(maxY, startY, controlY, endY);
+
+    if (conn.label) {
+      const t = 0.5;
+      const labelX = (1 - t) ** 2 * startX + 2 * (1 - t) * t * controlX + t ** 2 * endX;
+      const labelY = (1 - t) ** 2 * startY + 2 * (1 - t) * t * controlY + t ** 2 * endY;
+      minX = Math.min(minX, labelX - 50);
+      minY = Math.min(minY, labelY - 10);
+      maxX = Math.max(maxX, labelX + 50);
+      maxY = Math.max(maxY, labelY + 10);
+    }
+  });
+
+  // Padding hinzufügen
+  const padding = 20;
+  minX -= padding;
+  minY -= padding;
+  maxX += padding;
+  maxY += padding;
+
+  const width = maxX - minX;
+  const height = maxY - minY;
+
+  // SVG-Header
+  let svgContent = `
+    <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <marker id="arrowhead" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+          <polygon points="0 0, 8 4, 0 8" fill="#2c3e50" />
+        </marker>
+      </defs>
+  `;
+
+  // Nodes zeichnen (Koordinaten anpassen)
+  nodes.forEach(node => {
+    const rect = node.element.getBoundingClientRect();
+    const x = (rect.left - canvasRect.left) - minX;
+    const y = (rect.top - canvasRect.top) - minY;
+    const nodeWidth = rect.width;
+    const nodeHeight = rect.height;
+    const text = node.element.querySelector('.node-text').textContent;
+    const backgroundColor = node.backgroundColor || 'white';
+    const borderColor = node === selectedNode ? '#e74c3c' : '#3498db';
+    const shadow = node === selectedNode ? '0 0 0 3px rgba(231, 76, 60, 0.3)' : '0 2px 8px rgba(0,0,0,0.15)';
+
+    // Text umbrechen mit genauer Messung
+    const fontSize = 14;
+    const lineHeight = fontSize * 1.2;
+    const maxTextWidth = nodeWidth - 16; // Padding abziehen (8px pro Seite)
+    const lines = wrapSVGText(text, maxTextWidth, fontSize, lineHeight, measureCtx);
+    const textHeight = lines.length * lineHeight;
+    const textY = y + (nodeHeight - textHeight) / 2 + lineHeight / 2; // Zentrieren
+
+    svgContent += `
+      <rect x="${x}" y="${y}" width="${nodeWidth}" height="${nodeHeight}"
+            fill="${backgroundColor}" stroke="${borderColor}" stroke-width="3"
+            rx="8" ry="8" style="filter: drop-shadow(${shadow});" />
+      <text x="${x + nodeWidth / 2}" y="${textY}"
+            font-family="Arial, sans-serif" font-size="${fontSize}"
+            fill="#2c3e50" text-anchor="middle" dominant-baseline="middle">
+    `;
+    lines.forEach((line, index) => {
+      if (index === 0) {
+        svgContent += `<tspan x="${x + nodeWidth / 2}" dy="0">${line}</tspan>`;
+      } else {
+        svgContent += `<tspan x="${x + nodeWidth / 2}" dy="${lineHeight}">${line}</tspan>`;
+      }
+    });
+    svgContent += `</text>`;
+  });
+
+  // Verbindungen zeichnen (Koordinaten anpassen)
+  connections.forEach(conn => {
+    const fromNode = nodes.find(n => n.id === conn.from);
+    const toNode = nodes.find(n => n.id === conn.to);
+    
+    if (!fromNode || !toNode) return;
+
+    const fromRect = fromNode.element.getBoundingClientRect();
+    const toRect = toNode.element.getBoundingClientRect();
+
+    const x1 = (fromRect.left + fromRect.width / 2 - canvasRect.left) - minX;
+    const y1 = (fromRect.top + fromRect.height / 2 - canvasRect.top) - minY;
+    const x2 = (toRect.left + toRect.width / 2 - canvasRect.left) - minX;
+    const y2 = (toRect.top + toRect.height / 2 - canvasRect.top) - minY;
+
+    let startPoint = getBorderPoint(x1 + minX, y1 + minY, x2 + minX, y2 + minY, fromRect, canvasRect);
+    if (!startPoint) startPoint = {x: x1 + minX, y: y1 + minY};
+    startPoint.x -= minX;
+    startPoint.y -= minY;
+
+    let endPoint = getBorderPoint(x2 + minX, y2 + minY, x1 + minX, y1 + minY, toRect, canvasRect);
+    if (!endPoint) endPoint = {x: x2 + minX, y: y2 + minY};
+    endPoint.x -= minX;
+    endPoint.y -= minY;
+
+    const startX = startPoint.x;
+    const startY = startPoint.y;
+    const endX = endPoint.x;
+    const endY = endPoint.y;
+    const controlX = conn.controlX - minX;
+    const controlY = conn.controlY - minY;
+
+    const strokeColor = conn === selectedConnection ? '#e74c3c' : '#95a5a6';
+
+    svgContent += `
+      <path d="M ${startX} ${startY} Q ${controlX} ${controlY} ${endX} ${endY}"
+            stroke="${strokeColor}" stroke-width="3" fill="none"
+            marker-end="url(#arrowhead)" stroke-linecap="round" />
+    `;
+
+    if (conn.label && conn.label.trim() !== '') {
+      const t = 0.5;
+      const labelX = (1 - t) ** 2 * startX + 2 * (1 - t) * t * controlX + t ** 2 * endX;
+      const labelY = (1 - t) ** 2 * startY + 2 * (1 - t) * t * controlY + t ** 2 * endY;
+      // Label mit Textumbruch rendern
+      const labelFontSize = 12;
+      const labelLineHeight = labelFontSize * 1.2;
+      measureCtx.font = `${labelFontSize}px Arial, sans-serif`;
+      const labelPadding = 4;
+      const maxLabelTextWidth = 100 - 2 * labelPadding;
+      const labelLines = wrapSVGText(conn.label, maxLabelTextWidth, labelFontSize, labelLineHeight, measureCtx);
+      const labelTextHeight = labelLines.length * labelLineHeight;
+      const labelRectHeight = labelTextHeight + 2 * labelPadding;
+      const labelRectWidth = 100;
+      const labelRectX = labelX - labelRectWidth / 2;
+      const labelRectY = labelY - labelRectHeight / 2;
+      const labelTextY = labelRectY + labelPadding + labelLineHeight / 2; // Baseline für erste Zeile
+
+      svgContent += `
+        <rect x="${labelRectX}" y="${labelRectY}" width="${labelRectWidth}" height="${labelRectHeight}"
+              fill="white" stroke="#95a5a6" stroke-width="1" rx="3" ry="3" />
+        <text x="${labelX}" y="${labelTextY}"
+              font-family="Arial, sans-serif" font-size="${labelFontSize}"
+              fill="#2c3e50" text-anchor="middle" dominant-baseline="central">
+      `;
+      labelLines.forEach((line, index) => {
+        const dy = index * labelLineHeight;
+        svgContent += `<tspan x="${labelX}" dy="${dy}">${line}</tspan>`;
+      });
+      svgContent += `</text>`;
+    }
+  });
+  svgContent += `</svg>`;
+
+  // SVG als Datei herunterladen
+  const blob = new Blob([svgContent], { type: 'image/svg+xml' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = 'concept_map.svg';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+ 
+    document.querySelector('.conceptmap #exportSVG').addEventListener('click', () => {
+      exportToSVG();
+    });
+
+
+    function saveToJSON() {
+      const data = {
+        nodes: nodes.map(n => ({
+          id: n.id,
+          x: n.x,
+          y: n.y,
+          text: n.element.querySelector('.node-text').textContent,
+          backgroundColor: n.backgroundColor
+        })),
+        connections: connections.map(c => ({
+          id: c.id,
+          from: c.from,
+          to: c.to,
+          label: c.label,
+          controlX: c.controlX,
+          controlY: c.controlY
+        }))
+      };
+      jsonInput.value = JSON.stringify(data);
+    }
+
+    function loadFromJSON(jsonStr) {
+      try {
+        const data = JSON.parse(jsonStr);
+        
+        nodes.forEach(n => {
+          n.element.remove();
+          n.connectBtn.remove();
+        });
+        connections.forEach(c => {
+          if (c.labelElement) c.labelElement.remove();
+        });
+        nodes = [];
+        connections = [];
+        
+        if (data.nodes) {
+          data.nodes.forEach(n => {
+            createNode(n.x, n.y, n.text, n.id, n.backgroundColor);
+            if (n.id >= nodeIdCounter) nodeIdCounter = n.id + 1;
+          });
+        }
+        
+        if (data.connections) {
+          data.connections.forEach(c => {
+            const from = nodes.find(n => n.id === c.from);
+            const to = nodes.find(n => n.id === c.to);
+            if (from && to) {
+              createConnection(from, to, c.label, c.controlX, c.controlY, c.id);
+              if (c.id >= connectionIdCounter) connectionIdCounter = c.id + 1;
+            }
+          });
+        }
+        
+        renderConnections();
+      } catch (e) {
+        alert('Fehler beim Laden: Ungültiges JSON-Format');
+      }
+    }
+
+
+    function attachLabelEvents(element, conn) {
+      let lastTap = 0;
+
+      const editLabel = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.value = conn.label;
+        input.style.width = '100%';
+        input.style.position = 'absolute';
+        input.style.left = '0';
+        input.style.top = '0';
+        input.style.zIndex = '100';
+        element.appendChild(input);
+        input.focus();
+        input.select();
+        const saveInput = () => {
+          const newLabel = input.value.trim();
+          conn.label = newLabel;
+          renderConnections();
+          saveToJSON();
+          input.remove();
+        };
+        input.addEventListener('blur', saveInput);
+        input.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            input.blur();
+          }
+        });
+      };
+   
+
+      element.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const now = new Date().getTime();
+        if (now - lastTap < 300) {
+          editLabel(e);
+        }
+        lastTap = now;
+      });
+
+      element.addEventListener('dblclick', (e) => {
+        e.stopPropagation();
+        editLabel(e);
+      });
+    }
+
+  </script>

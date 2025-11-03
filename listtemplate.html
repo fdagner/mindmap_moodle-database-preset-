@@ -1,21 +1,20 @@
-<div id="import-area-##id##" style="display: none">[[mermaid_text]]</div>
-<div class="mindmap-wrapper">
-        ##actionsmenu##
-        <input type="text" id="##id##" class="export-input"
-                placeholder="Use ~ for each indentation level and | to separate nodes" value="" style="display: none">
-        <p id="color-##id##" style="display: none">[[color_theme]]</p>
-        <div style="display: flex; flex-direction: row; flex-wrap: wrap;gap: 20px;">
-                <span>##userpicture##</span>
-                <h3 id="root-text-##id##" class="root-text"></h3>
-        </div>
-        <a href="##moreurl##">
-                <div id="svgContainer-##id##" class="svg-container-list"></div>
-        </a>
-        <p>Mindmap von ##user## - zuletzt geändert: ##timemodified##</p>
-        <p>##comments##</p>
-</div>
-<script>const sourceDiv##id## = document.getElementById('import-area-##id##');
-        const targetInput##id## = document.getElementById('##id##');
-        const cleanText##id## = sourceDiv##id##.innerText;
-targetInput##id##.value = cleanText##id##;
-</script>
+  <div class="card border-0 shadow-sm rounded-4" style="width: 300px; transition: transform 0.2s, box-shadow 0.2s;">
+    <div class="card-body">
+<div style="float:right">##actionsmenu##</div>
+      <p class="card-title mb-2 d-flex align-items-center gap-2">
+        ##userpicture##
+        <span class="fw-semibold text-dark">##user##</span>
+      </p>
+<br>
+      <p>
+        <a href="##moreurl##" class="btn btn-secondary text-decoration-none link-primary fw-medium"><i class="fa-solid fa-diagram-project"></i></a>
+          [[thema]]
+      </p>
+    </div>
+
+    <div class="card-footer bg-transparent border-0 text-end pt-0">
+      <small class="text-muted fst-italic">
+        zuletzt geändert: ##timemodified##
+      </small>
+    </div>
+  </div>

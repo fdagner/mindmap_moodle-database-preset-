@@ -1,1408 +1,1132 @@
-    <style>
-        #[[color_theme#id]] {
-            background-color: #f8f9fa;
-            border-color: #f8f9fa;
-        }
-
-        label[for="[[color_theme#id]]"] {
-            display: block;
-        }
-
-        .node.dragging {
-            opacity: 0.5;
-        }
-
-        .node.drag-over-child {
-            background-color: #e6f3ff;
-        }
-
-
-        .node.drag-over-sibling::after {
-            content: '';
-            position: absolute;
-            bottom: -2px;
-            left: 0;
-            width: 100%;
-            height: 2px;
-            background-color: #007bff;
-        }
-
-        .node.drag-over-sibling-top::before {
-            content: '';
-            position: absolute;
-            top: -2px;
-            left: 0;
-            width: 100%;
-            height: 2px;
-            background-color: #007bff;
-
-        }
-
-        .add-btn.drop-target {
-            background-color: #d4edda;
-        }
-    </style>
-
-<div class="main-content" id="fullscreen_mindmap">
-    <div class="zoom-controls">
-        <div class="mindmap fullscreen_mindmap">
-            <div class="mindmap_buttons">
-                <button type="button" class="btn btn-light toggle-editor-btn" onclick="toggleEditor()"
-                    title="Listenmodus umschalten"><i class="fa-solid fa-list"></i></button>
-                <button type="button" class="btn btn-light" onclick="zoomSvg(1.2)" title="Hineinzoomen"><i
-                        class="fa-solid fa-magnifying-glass-plus"></i></button>
-                <button type="button" class="btn btn-light" onclick="zoomSvg(1/1.2)" title="Herauszoomen"><i
-                        class="fa-solid fa-magnifying-glass-minus"></i></button>
-                <button type="button" class="btn btn-light" onclick="resetZoom()" title="Zoom zurücksetzen"><i
-                        class="fa-solid fa-arrows-to-circle"></i></button>
-                <button type="button" class="btn btn-light toggle-fullscreen-btn" onclick="togglePresentationMode()" title="Präsentationsmodus"><i
-                        class="fa-solid fa-person-chalkboard"></i></button>
-                [[color_theme]]
-            </div>
-        </div>
-        <div class="editor-panel" style="display: none;">
-            <div id="mindmapEditor" class="mindmap-tree"></div>
-            <div class="export-area" style="display: none;">
-                <strong>Mermaid Code:</strong>
-                [[mermaid_text]]
-            </div>
-        </div>
-        <div class="preview-panel">
-            <div id="mermaidPreview" class="loading">
-                <div id="welcomeMessage">
-                    Klicke auf den Hauptknoten, um zu beginnen 😀...
-                </div>
-                <div id="svgZoomContainer"></div>
-            </div>
-        </div>
+<div class="conceptmap">
+  <div class="inner">
+    <table class="table"><tr><td><h4>Thema</h4></td><td style="width: 100%">[[thema]]</td></tr></table>
+    <div id="toolbar" class="container-fluid bg-dark text-white p-3 d-flex flex-wrap align-items-center gap-2">
+      <button type="button" id="addNode" class="btn btn-primary btn-sm"><i class="fa-solid fa-plus"></i> Element</button>
+      <button type="button" id="deleteMode" class="btn btn-danger btn-sm"><i class="fa-solid fa-trash"></i> Löschen</button>
+      <div class="btn-group btn-group-sm flex-wrap align-items-center gap-2" role="group">
+        <button type="button" class="btn btn-outline-light rounded-circle color-button" style="width: 30px; height: 30px; padding: 0; background-color: #fff;" data-color="#e6f3fa" title="Weiß"></button>
+        <button type="button" class="btn btn-outline-light rounded-circle color-button" style="width: 30px; height: 30px; padding: 0; background-color: #e6f3fa;" data-color="#e6f3fa" title="Blau"></button>
+        <button type="button" class="btn btn-outline-light rounded-circle color-button" style="width: 30px; height: 30px; padding: 0; background-color: #f0e6fa;" data-color="#f0e6fa" title="Lila"></button>
+        <button type="button" class="btn btn-outline-light rounded-circle color-button" style="width: 30px; height: 30px; padding: 0; background-color: #e6fae6;" data-color="#e6fae6" title="Grün"></button>
+        <button type="button" class="btn btn-outline-light rounded-circle color-button" style="width: 30px; height: 30px; padding: 0; background-color: #faf0e6;" data-color="#faf0e6" title="Orange"></button>
+        <button type="button" class="btn btn-outline-light rounded-circle color-button" style="width: 30px; height: 30px; padding: 0; background-color: #f5f5e6;" data-color="#f5f5e6" title="Gelb"></button>
+      </div>
+      <button type="button" id="clearAll" class="btn btn-warning btn-sm"><i class="fa-solid fa-arrows-rotate"></i> Neu beginnen</button>
+      <i class="fas fa-question-circle text-primary fa-2x ms-2" data-bs-toggle="modal" data-bs-target="#conceptMapModal" style="cursor:pointer;"></i>
+      <div style="display: none;">[[code]]</div>
     </div>
-
-    <div id="deleteModal" class="mindmap-modal">
-        <div class="mindmap-modal-content">
-            <h3>Knoten löschen</h3>
-            <p id="deleteModalMessage"></p>
-            <div class="mindmap-modal-buttons" id="deleteModalButtons"></div>
-        </div>
+    <div id="canvas" style="touch-action: auto;">
+      <svg id="svg"></svg>
     </div>
-
-    <div id="errorModal" class="mindmap-modal">
-        <div class="mindmap-modal-content">
-            <h3>Fehler</h3>
-            <p id="errorModalMessage"></p>
-            <div class="mindmap-modal-buttons">
-                <button type="button" class="btn btn-primary" onclick="closeErrorModal()">OK</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="successModal" class="mindmap-modal">
-        <div class="mindmap-modal-content">
-            <h3>Erfolg</h3>
-            <p id="successModalMessage"></p>
-            <div class="mindmap-modal-buttons">
-                <button type="button" class="btn btn-primary" onclick="closeSuccessModal()">OK</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="warningModal" class="mindmap-modal">
-        <div class="mindmap-modal-content">
-            <h3>Warnung</h3>
-            <p id="warningModalMessage"></p>
-            <div class="mindmap-modal-buttons">
-                <button type="button" class="btn btn-primary" onclick="closeWarningModal()">OK</button>
-            </div>
-        </div>
-    </div>
-
-    <script>
- 
-   let BRANCH_COLORS = BRANCH_COLORS_SCHEMES['Standard'].colors;
-        const editor = document.getElementById('mindmapEditor');
-        const previewContainer = document.getElementById('svgZoomContainer');
-        const mermaidInput = document.getElementById('[[mermaid_text#id]]');
-        const welcomeMessage = document.getElementById('welcomeMessage');
-
-        // Function for setting the color scheme
-        function setColorScheme() {
-            const colorThemeSelect = document.getElementById('[[color_theme#id]]');
-            if (!colorThemeSelect) return;
-
-            let selectedScheme = colorThemeSelect.options[colorThemeSelect.selectedIndex].value;
-            if (!selectedScheme) selectedScheme = 'Standard';
-
-            if (BRANCH_COLORS_SCHEMES[selectedScheme]) {
-                BRANCH_COLORS = [...BRANCH_COLORS_SCHEMES[selectedScheme].colors];
-            } else {
-                BRANCH_COLORS = [...BRANCH_COLORS_SCHEMES['Standard'].colors];
-            }
-
-            renderEditor();
-            renderMindmap();
-        }
-
-        // Function to show/hide the editor
-        const toggleEditor = () => {
-            const editorPanel = document.querySelector('.editor-panel');
-            const previewPanel = document.querySelector('.preview-panel');
-            const toggleButton = document.querySelector('.toggle-editor-btn');
-            const zoomButtons = document.querySelectorAll('.zoom-controls .btn.btn-light:not(.toggle-editor-btn)');
-
-            if (editorPanel.style.display === 'none') {
-                editorPanel.style.display = 'block';
-                previewPanel.style.display = 'none';
-                toggleButton.innerHTML = '<i class="fa-solid fa-lightbulb"></i>';
-                zoomButtons.forEach(button => button.style.display = 'none');
-                if (welcomeMessage) welcomeMessage.style.display = 'none';
-            } else {
-                editorPanel.style.display = 'none';
-                previewPanel.style.display = 'block';
-                toggleButton.innerHTML = '<i class="fa-solid fa-list"></i>';
-                zoomButtons.forEach(button => button.style.display = 'inline-block');
-                if (welcomeMessage && !hasInteractedWithRoot && !mindmapData.some(node => node.parent !== null)) {
-                    welcomeMessage.style.display = 'block';
-                }
-            }
-        };
-
-        // Initialization
-        document.addEventListener('DOMContentLoaded', () => {
-            if (!editor || !previewContainer || !mermaidInput || !welcomeMessage) {
-                console.error('Required DOM elements are missing:', {
-                    mindmapEditor: !!editor,
-                    svgZoomContainer: !!previewContainer,
-                    mermaidInput: !!mermaidInput,
-                    welcomeMessage: !!welcomeMessage
-                });
-                showErrorModal('Interner Fehler: Erforderliche DOM-Elemente fehlen. Bitte überprüfen Sie die HTML-Struktur.');
-                mindmapData = [];
-                const defaultRootNode = {
-                    id: nodeCounter++,
-                    text: 'Hauptknoten',
-                    level: 0,
-                    parent: null,
-                    order: 0,
-                    branchIndex: 0
-                };
-                mindmapData.push(defaultRootNode);
-                renderEditor();
-                if (welcomeMessage) welcomeMessage.style.display = 'block';
-                return;
-            }
-            initializeFromMermaidCode();
-            setColorScheme();
-            renderMindmap();
-            const colorThemeSelect = document.getElementById('[[color_theme#id]]');
-            if (colorThemeSelect) {
-                colorThemeSelect.addEventListener('change', setColorScheme);
-            }
-        });
-
-        // Zoom
-        const zoomSvg = (factor) => {
-            if (!previewContainer) return;
-            currentZoom *= factor;
-            previewContainer.style.transformOrigin = '0 0';
-            previewContainer.style.transform = `scale(${currentZoom})`;
-            document.getElementById('mermaidPreview').style.overflow = 'auto';
-        };
-
-        const resetZoom = () => {
-            if (!previewContainer) return;
-            currentZoom = 1;
-            previewContainer.style.transform = 'none';
-            document.getElementById('mermaidPreview').style.overflow = 'auto';
-        };
-
-        // Node validation
-        const validateNodeText = (text, inputElement) => {
-            if (!text.trim()) {
-                showErrorModal('Die Eingabe darf nicht leer sein.');
-                inputElement?.focus();
-                return false;
-            }
-            if (text.length > MAX_TEXT_LENGTH) {
-                showErrorModal(`Die Eingabe darf maximal ${MAX_TEXT_LENGTH} Zeichen lang sein.`);
-                inputElement?.focus();
-                return false;
-            }
-            if (/<[a-zA-Z0-9\s="/]*(>|\/>|on[a-zA-Z]+=["'])|[|~<>]/i.test(text)) {
-                showErrorModal('Die Eingabe darf keinen HTML-Code, Skripte, "|", "~", "<" oder ">" enthalten.');
-                inputElement?.focus();
-                return false;
-            }
-            return true;
-        };
-
-        // Real-time input validation for SVG overlay
-        const validateInputLength = (inputElement, nodeId) => {
-            let text = inputElement.value;
-            if (text.length > MAX_TEXT_LENGTH) {
-                showErrorModal(`Die Eingabe darf maximal ${MAX_TEXT_LENGTH} Zeichen lang sein.`);
-                inputElement.value = text.slice(0, MAX_TEXT_LENGTH);
-                inputElement.focus();
-            }
-            if (/<[a-zA-Z0-9\s="/]*(>|\/>|on[a-zA-Z]+=["'])|[|~<>]/i.test(text)) {
-                showErrorModal('Die Eingabe darf keinen HTML-Code, Skripte, "|", "~", "<" oder ">" enthalten.');
-                inputElement.value = text.replace(/[<|~>]/g, '');
-                inputElement.focus();
-            }
-        };
-
-        // Initializes mind map data from Mermaid code
-        function initializeFromMermaidCode() {
-            if (!mermaidInput) {
-                console.error('Element with ID "[[mermaid_text#id]]" not found in the DOM.');
-                showErrorModal('Interner Fehler: Das Eingabefeld für den Mermaid-Code wurde nicht gefunden.');
-                mindmapData = [];
-                const defaultRootNode = {
-                    id: nodeCounter++,
-                    text: 'Hauptknoten',
-                    level: 0,
-                    parent: null,
-                    order: 0,
-                    branchIndex: 0
-                };
-                mindmapData.push(defaultRootNode);
-                renderEditor();
-                if (welcomeMessage) welcomeMessage.style.display = 'block';
-                return;
-            }
-
-            const codeInput = mermaidInput.value;
-            const lines = codeInput.split('|').map(line => line.trimEnd()).filter(line => line.trim().length > 0);
-
-            mindmapData = [];
-            let levelMap = {};
-            let branchIndexCounter = 0;
-
-            if (!codeInput.trim() || lines.length === 0 || (lines.length === 1 && lines[0].trim() === 'mindmap')) {
-                const defaultRootNode = {
-                    id: nodeCounter++,
-                    text: 'Hauptknoten',
-                    level: 0,
-                    parent: null,
-                    order: 0,
-                    branchIndex: 0
-                };
-                mindmapData.push(defaultRootNode);
-                mermaidInput.value = 'mindmap|root(Hauptknoten)';
-                renderEditor();
-                if (welcomeMessage) welcomeMessage.style.display = 'block';
-                return;
-            }
-
-            if (!lines[0] || lines[0].trim() !== 'mindmap') {
-                lines.unshift('mindmap');
-            }
-
-            lines.forEach((line, index) => {
-                if (line.trim() === 'mindmap') return;
-
-                const match = line.match(/^(~*)[^~]*/);
-                if (!match) return;
-                const level = match[1] ? match[1].length : 0;
-                const textWithIndent = match[0];
-
-                if (level > MAX_LEVEL) return;
-
-                let parentId = null;
-                if (level > 0) {
-                    for (let i = level - 1; i >= 0; i--) {
-                        if (levelMap[i] !== undefined) {
-                            parentId = levelMap[i];
-                            break;
-                        }
-                    }
-                }
-
-                if (parentId !== null) {
-                    const childrenCount = mindmapData.filter(node => node.parent === parentId).length;
-                    if (childrenCount >= MAX_CHILDREN_PER_NODE) return;
-                }
-
-                let text = textWithIndent.replace(/^~*/, '').trim();
-                if (text.startsWith('root(') && text.endsWith(')')) {
-                    text = text.slice(5, -1);
-                }
-
-                if (!validateNodeText(text)) return;
-
-                const siblings = mindmapData.filter(n => n.parent === parentId);
-                const order = siblings.length;
-
-                const branchIndex = level === 0 ? 0 :
-                    level === 1 ? branchIndexCounter++ :
-                        mindmapData.find(n => n.id === parentId)?.branchIndex || 0;
-
-                const newNode = {
-                    id: nodeCounter++,
-                    text: text,
-                    level: level,
-                    parent: parentId,
-                    order: order,
-                    branchIndex: branchIndex
-                };
-
-                mindmapData.push(newNode);
-                levelMap[level] = newNode.id;
-
-                Object.keys(levelMap).forEach(key => {
-                    if (parseInt(key) > level) {
-                        delete levelMap[key];
-                    }
-                });
-            });
-
-            if (mindmapData.length === 0) {
-                const defaultRootNode = {
-                    id: nodeCounter++,
-                    text: 'Hauptknoten',
-                    level: 0,
-                    parent: null,
-                    order: 0,
-                    branchIndex: 0
-                };
-                mindmapData.push(defaultRootNode);
-                mermaidInput.value = 'mindmap|root(Hauptknoten)';
-                if (welcomeMessage) welcomeMessage.style.display = 'block';
-            } else if (welcomeMessage && !mindmapData.some(node => node.parent !== null)) {
-                welcomeMessage.style.display = 'block';
-            } else if (welcomeMessage) {
-                welcomeMessage.style.display = 'none';
-            }
-
-            renderEditor();
-        }
-
-        // Collapse/expand function for Level 1 nodes
-        const toggleCollapse = (nodeId) => {
-            const node = mindmapData.find(n => n.id === nodeId);
-            if (!node || node.level !== 1) return;
-            node.isCollapsed = !node.isCollapsed;
-            renderEditor();
-        };
-
-        // Checks whether a node is visible based on the isCollapsed state of its ancestors
-        const isNodeVisible = (node) => {
-            if (node.level === 0) return true;
-            const parent = mindmapData.find(n => n.id === node.parent);
-            if (!parent) return false;
-            if (parent.level === 1 && parent.isCollapsed) return false;
-            return isNodeVisible(parent);
-        };
-
-        // Node and editor rendering
-        const getSortedNodes = () => {
-            const nodes = [];
-            const rootNodes = mindmapData.filter(node => node.level === 0).sort((a, b) => a.order - b.order);
-            const addNodeAndChildren = node => {
-                if (!isNodeVisible(node)) return;
-                nodes.push(node);
-                if (node.level === 1 && node.isCollapsed) return;
-                mindmapData.filter(child => child.parent === node.id)
-                    .sort((a, b) => (a.order || 0) - (b.order || 0))
-                    .forEach(addNodeAndChildren);
-            };
-            rootNodes.forEach(addNodeAndChildren);
-            return nodes;
-        };
-
-        const renderEditor = () => {
-            if (!editor) return;
-            editor.innerHTML = '';
-            const sortedNodes = getSortedNodes();
-
-            sortedNodes.forEach((node, index) => {
-                const nodeDiv = document.createElement('div');
-                nodeDiv.className = 'node';
-                nodeDiv.dataset.nodeId = node.id;
-                nodeDiv.dataset.index = index;
-                nodeDiv.dataset.level = node.level;
-                nodeDiv.draggable = true;
-
-                const parent = node.level > 0 ? mindmapData.find(n => n.id === node.parent) : null;
-                node.branchIndex = node.level === 0 ? 0 :
-                    node.level === 1 ? mindmapData.filter(n => n.parent === node.parent).sort((a, b) => (a.order || 0) - (b.order || 0)).indexOf(node) :
-                        parent ? parent.branchIndex : 0;
-
-                const collapseIcon = node.level === 1 ? `<span class="collapse-icon" onclick="toggleCollapse(${node.id})" title="${node.isCollapsed ? 'Ast ausklappen' : 'Ast einklappen'}">${node.isCollapsed ? '<i class="fa-solid fa-chevron-right"></i>' : '<i class="fa-solid fa-chevron-down"></i>'}</span>` : '';
-                const addButton = node.level < MAX_LEVEL ? `
-                    <button type="button" class="add-btn drop-zone-child" 
-                            onclick="addChildNode(${node.id})" 
-                            title="Unterknoten hinzufügen"
-                            data-node-id="${node.id}"><i class="fa-solid fa-plus"></i></button>
-                ` : '';
-                const indent = node.level > 1 ? `<span class="indent">${'　'.repeat(node.level * 2)}</span>` : '';
-
-                const colorThemeSelect = document.getElementById('[[color_theme#id]]');
-                let selectedScheme = colorThemeSelect?.options[colorThemeSelect.selectedIndex]?.value || 'Standard';
-                const inputBackgroundColor = node.level === 0 ? BRANCH_COLORS_SCHEMES[selectedScheme].level0 :
-                    node.level === 1 ? BRANCH_COLORS[node.branchIndex % BRANCH_COLORS.length] :
-                        node.level === 2 ? BRANCH_COLORS[node.branchIndex % BRANCH_COLORS.length] :
-                            '#ffffff';
-                const textColor = getContrastTextColor(inputBackgroundColor);
-
-                nodeDiv.innerHTML = `
-                    ${indent}
-                    ${collapseIcon}
-                    ${addButton}
-                    <input type="text" class="node-input" value="${node.text}" 
-                           style="background-color: ${inputBackgroundColor}; color: ${textColor};"
-                           oninput="validateInputLength(this, ${node.id})"
-                           onchange="updateNodeText(${node.id}, this.value, this)"
-                           placeholder="Knotenbeschriftung eingeben" 
-                           draggable="false" 
-                           data-node-id="${node.id}">
-                    <button type="button" class="delete-btn" 
-                            onclick="showDeleteModal(${node.id})" 
-                            title="${node.level > 0 ? 'Knoten löschen' : 'Hauptknoten löschen'}" 
-                            data-node-id="${node.id}"><i class="fa-solid fa-trash"></i></button>
-                `;
-
-                nodeDiv.addEventListener('dragstart', handleDragStart);
-                nodeDiv.addEventListener('touchstart', handleDragStart, { passive: false });
-                nodeDiv.addEventListener('dragover', handleDragOver);
-                nodeDiv.addEventListener('drop', handleDrop);
-                nodeDiv.addEventListener('dragend', handleDragEnd);
-                nodeDiv.addEventListener('dragenter', e => e.preventDefault());
-                nodeDiv.addEventListener('dragleave', e => {
-                    const node = e.target.closest('.node');
-                    if (node && !node.contains(e.relatedTarget)) {
-                        node.classList.remove('drag-over-child', 'drag-over-sibling', 'drag-over-sibling-top');
-                    }
-                });
-                nodeDiv.addEventListener('touchmove', handleTouchMove, { passive: false });
-                nodeDiv.addEventListener('touchend', handleTouchEnd, { passive: false });
-
-                const inputElement = nodeDiv.querySelector('.node-input');
-                const addBtn = nodeDiv.querySelector('.add-btn');
-                const deleteBtn = nodeDiv.querySelector('.delete-btn');
-                const collapseIconElement = nodeDiv.querySelector('.collapse-icon');
-
-                [inputElement, addBtn, deleteBtn, collapseIconElement].forEach(el => {
-                    if (el) {
-                        el.addEventListener('dragstart', e => e.stopPropagation());
-                        el.addEventListener('touchstart', e => e.stopPropagation(), { passive: false });
-                    }
-                });
-
-                if (addBtn) {
-                    addBtn.addEventListener('dragover', handleDropZoneDragOver);
-                    addBtn.addEventListener('drop', e => handleDropZoneDrop(e, node.id, 'child'));
-                }
-
-                let isDragging = false;
-
-                inputElement.addEventListener('mousedown', e => {
-                    e.stopPropagation();
-                    isDragging = false;
-                    const input = e.target;
-                    const rect = input.getBoundingClientRect();
-                    const clickX = e.clientX - rect.left;
-                    const ctx = document.createElement('canvas').getContext('2d');
-                    ctx.font = window.getComputedStyle(input).fontSize + ' ' + window.getComputedStyle(input).fontFamily;
-                    const text = input.value;
-                    let bestPosition = 0;
-                    for (let i = 0; i <= text.length; i++) {
-                        if (ctx.measureText(text.substring(0, i)).width + 10 >= clickX) {
-                            bestPosition = i;
-                            break;
-                        }
-                        bestPosition = i;
-                    }
-                    setTimeout(() => !isDragging && input.setSelectionRange(bestPosition, bestPosition), 0);
-                });
-
-                inputElement.addEventListener('click', e => {
-                    e.stopPropagation();
-                    if (isDragging) return e.preventDefault();
-                    const input = e.target;
-                    setTimeout(() => {
-                        const rect = input.getBoundingClientRect();
-                        if ((e.clientX - rect.left) > (rect.width - 20) * 0.9) {
-                            input.setSelectionRange(input.value.length, input.value.length);
-                        }
-                    }, 10);
-                });
-
-                inputElement.addEventListener('keydown', e => (e.key === 'Enter' || e.keyCode === 13) && e.preventDefault() && e.target.blur());
-
-                editor.appendChild(nodeDiv);
-            });
-        };
-
-        // Node management
-        const addChildNode = (parentId, isSvgMode = false) => {
-            const parent = mindmapData.find(node => node.id === parentId);
-            if (!parent) return;
-            if (parent.level >= MAX_LEVEL) return showErrorModal(`Die maximale Tiefe von ${MAX_LEVEL} Ebenen wurde erreicht.`);
-            if (mindmapData.filter(node => node.parent === parentId).length >= MAX_CHILDREN_PER_NODE) {
-                return showErrorModal(`Der Elternknoten hat bereits die maximale Anzahl von ${MAX_CHILDREN_PER_NODE} Unterknoten erreicht.`);
-            }
-            const siblings = mindmapData.filter(node => node.parent === parentId);
-            const newNode = {
-                id: nodeCounter++,
-                text: 'Neuer Knoten',
-                level: parent.level + 1,
-                parent: parentId,
-                order: siblings.length > 0 ? Math.max(...siblings.map(s => s.order || 0)) + 1 : 0,
-                branchIndex: parent.level === 0 ? siblings.length : parent.branchIndex,
-                isCollapsed: parent.level === 1 ? false : undefined
-            };
-            mindmapData.push(newNode);
-            if (parent.level === 1) parent.isCollapsed = false;
-            renderEditor();
-            renderMindmap();
-            if (welcomeMessage && parent.level === 0) welcomeMessage.style.display = 'none';
-            if (isSvgMode) {
-                setTimeout(() => {
-                    const svgContainer = document.querySelector('#svgZoomContainer svg');
-                    if (svgContainer) {
-                        const targetRect = svgContainer.querySelector(`rect[data-node-id="${newNode.id}"]`);
-                        if (targetRect) {
-                            const rect = targetRect.getBoundingClientRect();
-                            const zoomFactor = currentZoom || 1;
-                            const inputOverlay = document.createElement('div');
-                            inputOverlay.className = 'input-overlay';
-                            const overlayWidth = (rect.width / zoomFactor) * 1;
-                            inputOverlay.style.left = `${rect.left + window.scrollX - (overlayWidth - rect.width / zoomFactor) / 2}px`;
-                            inputOverlay.style.top = `${rect.top + window.scrollY}px`;
-                            inputOverlay.style.width = `${overlayWidth}px`;
-                            inputOverlay.style.height = `${rect.height / zoomFactor}px`;
-                            const input = document.createElement('input');
-                            input.type = 'text';
-                            input.value = newNode.text;
-                            const colorThemeSelect = document.getElementById('[[color_theme#id]]');
-                            let selectedScheme = colorThemeSelect?.options[colorThemeSelect.selectedIndex]?.value || 'Standard';
-                            const inputBackgroundColor = newNode.level === 0 ? BRANCH_COLORS_SCHEMES[selectedScheme].level0 :
-                                newNode.level === 1 ? BRANCH_COLORS[newNode.branchIndex % BRANCH_COLORS.length] :
-                                    newNode.level === 2 ? BRANCH_COLORS[newNode.branchIndex % BRANCH_COLORS.length] :
-                                        '#ffffff';
-                            input.style.backgroundColor = inputBackgroundColor;
-                            input.style.color = getContrastTextColor(inputBackgroundColor);
-                            inputOverlay.appendChild(input);
-                            document.body.appendChild(inputOverlay);
-                            input.focus();
-                            input.select();
-
-                            let isSaving = false;
-
-                            input.addEventListener('input', () => {
-                                validateInputLength(input, newNode.id);
-                            });
-
-                            const saveInput = () => {
-                                if (isSaving) return;
-                                isSaving = true;
-                                if (validateNodeText(input.value, input)) {
-                                    updateNodeText(newNode.id, input.value, input);
-                                    renderEditor();
-                                }
-                                if (inputOverlay.isConnected) {
-                                    inputOverlay.remove();
-                                }
-                                document.removeEventListener('click', closeInputOverlay);
-                                isSaving = false;
-                            };
-
-                            input.addEventListener('blur', saveInput);
-                            input.addEventListener('keydown', (e) => {
-                                if (e.key === 'Enter' || e.keyCode === 13) {
-                                    e.preventDefault();
-                                    saveInput();
-                                }
-                            });
-
-                            const closeInputOverlay = (e) => {
-                                if (!inputOverlay.contains(e.target)) {
-                                    saveInput();
-                                }
-                            };
-                            document.addEventListener('click', closeInputOverlay);
-                        }
-                    }
-                }, 100);
-            } else {
-                setTimeout(() => document.querySelector(`input[onchange*="${newNode.id}"]`)?.focus()?.select(), 100);
-            }
-        };
-
-        const showDeleteModal = nodeId => {
-            nodeToDelete = parseInt(nodeId);
-            const node = mindmapData.find(n => n.id === nodeToDelete);
-            if (!node) {
-                nodeToDelete = null;
-                return showErrorModal('Der ausgewählte Knoten wurde nicht gefunden.');
-            }
-            const hasChildren = mindmapData.some(n => n.parent === nodeToDelete);
-            const buttons = node.level === 0 ? `
-                <button type="button" class="btn btn-secondary" onclick="closeDeleteModal()">Abbrechen</button>
-                <button type="button" class="btn btn-danger" onclick="confirmDelete(true, ${node.id})">Gesamte Mindmap löschen</button>
-            ` : hasChildren ? `
-                <button type="button" class="btn btn-secondary" onclick="closeDeleteModal()">Abbrechen</button>
-                <button type="button" class="btn btn-danger" onclick="confirmDelete(false, ${node.id})">Nur diesen Knoten</button>
-                <button type="button" class="btn btn-danger" onclick="confirmDelete(true, ${node.id})">Gesamten Ast</button>
-            ` : `
-                <button type="button" class="btn btn-secondary" onclick="closeDeleteModal()">Abbrechen</button>
-                <button type="button" class="btn btn-danger" onclick="confirmDelete(false, ${node.id})">Knoten löschen</button>
-            `;
-            showModal('deleteModal', node.level === 0 ? 'Achtung, der Hauptknoten löscht die gesamte Mindmap.' :
-                hasChildren ? 'Möchtest du nur diesen Knoten oder den gesamten Ast (inklusive Unterknoten) löschen?' :
-                    'Möchtest du diesen Knoten löschen?', buttons);
-        };
-
-        const closeDeleteModal = () => closeModal('deleteModal');
-
-        const confirmDelete = (deleteBranch, nodeId) => {
-            const id = parseInt(nodeId);
-            const node = mindmapData.find(n => n.id === id);
-            if (!node) {
-                closeDeleteModal();
-                return showErrorModal('Der ausgewählte Knoten wurde nicht gefunden.');
-            }
-            if (node.level === 0) {
-                mindmapData = [];
-                nodeCounter = 0;
-                const newRootNode = { id: nodeCounter++, text: 'Hauptknoten', level: 0, parent: null, order: 0, branchIndex: 0, isCollapsed: false };
-                mindmapData.push(newRootNode);
-                if (mermaidInput) mermaidInput.value = 'mindmap|root(Hauptknoten)';
-                if (welcomeMessage) welcomeMessage.style.display = 'block';
-            } else if (deleteBranch) {
-                deleteNodeAndChildren(id);
-                normalizeOrders();
-            } else {
-                const children = mindmapData.filter(n => n.parent === id);
-                const parentId = node.parent;
-                const parentChildrenCount = mindmapData.filter(n => n.parent === parentId && n.id !== id).length;
-                if (children.length + parentChildrenCount > MAX_CHILDREN_PER_NODE) {
-                    showErrorModal(`Der Elternknoten würde die maximale Anzahl von ${MAX_CHILDREN_PER_NODE} Unterknoten überschreiten.`);
-                    return closeDeleteModal();
-                }
-                children.forEach(child => {
-                    if (child.level > MAX_LEVEL) {
-                        showErrorModal(`Das Verschieben der Unterknoten würde die maximale Tiefe von ${MAX_LEVEL} Ebenen überschreiten.`);
-                        return closeDeleteModal();
-                    }
-                    child.parent = parentId;
-                    child.level = node.level;
-                    child.branchIndex = node.branchIndex;
-                });
-                mindmapData = mindmapData.filter(n => n.id !== id);
-                normalizeOrders();
-            }
-            renderEditor();
-            renderMindmap();
-            closeDeleteModal();
-        };
-
-        const deleteNodeAndChildren = id => {
-            mindmapData.filter(node => node.parent === id).forEach(child => deleteNodeAndChildren(child.id));
-            mindmapData = mindmapData.filter(node => node.id !== id);
-            if (welcomeMessage && !mindmapData.some(node => node.parent !== null)) {
-                welcomeMessage.style.display = 'block';
-            }
-        };
-
-        const updateNodeText = (nodeId, newText, inputElement) => {
-            const node = mindmapData.find(n => n.id === nodeId);
-            if (!node || !validateNodeText(newText, inputElement)) {
-                inputElement.value = node.text;
-                return;
-            }
-            node.text = newText.trim();
-            renderMindmap();
-        };
-
-        // Drag-and-drop and touch handling
-        const getTargetElement = (x, y) => {
-            let target = document.elementFromPoint(x, y);
-            if (!target) {
-                const nodes = document.querySelectorAll('.node');
-                target = Array.from(nodes).find(node => {
-                    const rect = node.getBoundingClientRect();
-                    return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
-                });
-            }
-            return target;
-        };
-
-        const handleDragStart = e => {
-            if (e.type === 'touchstart' && e.touches.length > 1) return;
-            if (e.type === 'touchstart') e.preventDefault();
-            const node = e.target.closest('.node');
-            draggedNode = parseInt(node.dataset.nodeId);
-            node.classList.add('dragging');
-            document.querySelectorAll('.add-btn').forEach(btn => btn.style.boxShadow = '0 0 5px rgba(0, 0, 0, 0.3)');
-            if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
-        };
-
-        const handleDragOver = e => {
-            e.preventDefault();
-            e.dataTransfer.dropEffect = 'move';
-            const targetNode = e.target.closest('.node');
-            if (!targetNode || parseInt(targetNode.dataset.nodeId) === draggedNode) return;
-
-            document.querySelectorAll('.node').forEach(n => n.classList.remove('drag-over-child', 'drag-over-sibling', 'drag-over-sibling-top'));
-
-            const rect = targetNode.getBoundingClientRect();
-            const offsetY = e.clientY - rect.top;
-            const nodeToMove = mindmapData.find(n => n.id === draggedNode);
-            const targetNodeData = mindmapData.find(n => n.id === parseInt(targetNode.dataset.nodeId));
-
-            if (nodeToMove && targetNodeData && nodeToMove.parent === targetNodeData.parent && nodeToMove.level > 0) {
-                // Same parent, consider reordering
-                const threshold = rect.height / 3;
-                if (offsetY < threshold) {
-                    targetNode.classList.add('drag-over-sibling-top');
-                } else if (offsetY > rect.height - threshold) {
-                    targetNode.classList.add('drag-over-sibling');
-                } else {
-                    targetNode.classList.add('drag-over-child');
-                }
-            } else {
-                targetNode.classList.add('drag-over-child');
-            }
-        };
-
-        const handleDropZoneDragOver = e => {
-            e.preventDefault();
-            e.stopPropagation();
-            e.dataTransfer.dropEffect = 'move';
-            e.target.classList.add('drop-target');
-        };
-
-        const handleDropZoneDrop = (e, targetNodeId, dropType) => {
-            e.preventDefault();
-            e.stopPropagation();
-            if (draggedNode !== targetNodeId) moveNodeAdvanced(draggedNode, targetNodeId, dropType);
-            document.querySelectorAll('.drop-target').forEach(el => el.classList.remove('drop-target'));
-        };
-
-        const handleDrop = e => {
-            e.preventDefault();
-            const targetNode = e.target.closest('.node');
-            if (!targetNode) return;
-            const targetNodeId = parseInt(targetNode.dataset.nodeId);
-            if (draggedNode === targetNodeId) return;
-
-            const rect = targetNode.getBoundingClientRect();
-            const offsetY = e.clientY - rect.top;
-            const nodeToMove = mindmapData.find(n => n.id === draggedNode);
-            const targetNodeData = mindmapData.find(n => n.id === targetNodeId);
-
-            let dropType = 'child';
-            if (nodeToMove.parent === targetNodeData.parent && nodeToMove.level > 0) {
-                const threshold = rect.height / 3;
-                if (offsetY < threshold) {
-                    dropType = 'before';
-                } else if (offsetY > rect.height - threshold) {
-                    dropType = 'after';
-                }
-            }
-
-            moveNodeAdvanced(draggedNode, targetNodeId, dropType);
-            document.querySelectorAll('.node').forEach(node => node.classList.remove('drag-over-child', 'drag-over-sibling', 'drag-over-sibling-top'));
-        };
-
-        const handleDragEnd = e => {
-            e.target.closest('.node').classList.remove('dragging');
-            draggedNode = null;
-            document.querySelectorAll('.node').forEach(node => node.classList.remove('drag-over-child', 'drag-over-sibling', 'drag-over-sibling-top'));
-            document.querySelectorAll('.add-btn').forEach(btn => {
-                btn.style.boxShadow = 'none';
-                btn.classList.remove('drop-target');
-            });
-        };
-
-        const handleTouchMove = e => {
-            if (!draggedNode || e.touches.length > 1) return;
-            e.preventDefault();
-            const touch = e.touches[0];
-            document.querySelectorAll('.node').forEach(n => n.classList.remove('drag-over-child', 'drag-over-sibling', 'drag-over-sibling-top'));
-            const targetNode = getTargetElement(touch.clientX, touch.clientY)?.closest('.node');
-            if (targetNode && parseInt(targetNode.dataset.nodeId) !== draggedNode) {
-                const rect = targetNode.getBoundingClientRect();
-                const offsetY = touch.clientY - rect.top;
-                const nodeToMove = mindmapData.find(n => n.id === draggedNode);
-                const targetNodeData = mindmapData.find(n => n.id === parseInt(targetNode.dataset.nodeId));
-                if (nodeToMove && targetNodeData && nodeToMove.parent === targetNodeData.parent && nodeToMove.level > 0) {
-                    const threshold = rect.height / 3;
-                    if (offsetY < threshold) {
-                        targetNode.classList.add('drag-over-sibling-top');
-                    } else if (offsetY > rect.height - threshold) {
-                        targetNode.classList.add('drag-over-sibling');
-                    } else {
-                        targetNode.classList.add('drag-over-child');
-                    }
-                } else {
-                    targetNode.classList.add('drag-over-child');
-                }
-            }
-        };
-
-        const handleTouchEnd = e => {
-            if (!draggedNode) return;
-            e.preventDefault();
-            const touch = e.changedTouches[0];
-            const targetElement = getTargetElement(touch.clientX, touch.clientY);
-            const targetNode = targetElement?.closest('.node');
-            const dropZone = targetElement?.closest('.add-btn');
-
-            if (dropZone && draggedNode !== parseInt(dropZone.dataset.nodeId)) {
-                moveNodeAdvanced(draggedNode, parseInt(dropZone.dataset.nodeId), 'child');
-            } else if (targetNode && draggedNode !== parseInt(targetNode.dataset.nodeId)) {
-                const rect = targetNode.getBoundingClientRect();
-                const offsetY = touch.clientY - rect.top;
-                const nodeToMove = mindmapData.find(n => n.id === draggedNode);
-                const targetNodeData = mindmapData.find(n => n.id === parseInt(targetNode.dataset.nodeId));
-                let dropType = 'child';
-                if (nodeToMove.parent === targetNodeData.parent && nodeToMove.level > 0) {
-                    const threshold = rect.height / 3;
-                    if (offsetY < threshold) {
-                        dropType = 'before';
-                    } else if (offsetY > rect.height - threshold) {
-                        dropType = 'after';
-                    }
-                }
-                moveNodeAdvanced(draggedNode, parseInt(targetNode.dataset.nodeId), dropType);
-            }
-
-            document.querySelectorAll('.node').forEach(node => node.classList.remove('dragging', 'drag-over-child', 'drag-over-sibling', 'drag-over-sibling-top'));
-            document.querySelectorAll('.add-btn').forEach(btn => {
-                btn.style.boxShadow = 'none';
-                btn.classList.remove('drop-target');
-            });
-            draggedNode = null;
-        };
-
-        const moveNodeAdvanced = (nodeId, targetNodeId, dropType) => {
-            const nodeToMove = mindmapData.find(n => n.id === nodeId);
-            const targetNode = mindmapData.find(n => n.id === targetNodeId);
-            if (!nodeToMove || !targetNode) return;
-            if (isDescendant(nodeToMove.id, targetNode.id)) {
-                return showErrorModal('Ein Knoten kann nicht zu seinem eigenen Unterknoten verschoben werden!');
-            }
-
-            if (dropType === 'child') {
-                const childrenCount = mindmapData.filter(node => node.parent === targetNode.id && node.id !== nodeToMove.id).length;
-                if (childrenCount >= MAX_CHILDREN_PER_NODE) {
-                    return showErrorModal(`Der Zielknoten hat bereits die maximale Anzahl von ${MAX_CHILDREN_PER_NODE} Unterknoten erreicht.`);
-                }
-                const maxDepth = getMaxDepth(nodeToMove.id);
-                const newLevel = targetNode.level + 1;
-                if (newLevel + maxDepth > MAX_LEVEL) {
-                    return showErrorModal(`Das Verschieben würde die maximale Tiefe von ${MAX_LEVEL} Ebenen überschreiten.`);
-                }
-                nodeToMove.parent = targetNode.id;
-                nodeToMove.level = newLevel;
-                const siblings = mindmapData.filter(node => node.parent === targetNode.id && node.id !== nodeToMove.id)
-                    .sort((a, b) => (a.order || 0) - (b.order || 0));
-                nodeToMove.order = siblings.length > 0 ? Math.max(...siblings.map(s => s.order || 0)) + 1 : 0;
-                nodeToMove.branchIndex = targetNode.level === 0 ? siblings.length : targetNode.branchIndex;
-                nodeToMove.isCollapsed = newLevel === 1 ? false : undefined;
-                if (targetNode.level === 1) targetNode.isCollapsed = false;
-                if (targetNode.level === 0 && welcomeMessage) welcomeMessage.style.display = 'none';
-            } else if (dropType === 'before' || dropType === 'after') {
-                if (nodeToMove.parent !== targetNode.parent || nodeToMove.level === 0) {
-                    return showErrorModal('Knoten können nur innerhalb derselben Hierarchieebene neu angeordnet werden.');
-                }
-                const siblings = mindmapData.filter(node => node.parent === nodeToMove.parent && node.id !== nodeToMove.id)
-                    .sort((a, b) => (a.order || 0) - (b.order || 0));
-                const targetIndex = siblings.findIndex(s => s.id === targetNode.id);
-                const newOrder = dropType === 'before' ? (targetNode.order || 0) : (targetNode.order || 0) + 1;
-                nodeToMove.order = newOrder;
-                siblings.splice(targetIndex + (dropType === 'after' ? 1 : 0), 0, nodeToMove);
-                siblings.forEach((sibling, index) => {
-                    sibling.order = index + 1000;
-                    sibling.branchIndex = nodeToMove.parent === null ? index : mindmapData.find(n => n.id === nodeToMove.parent).branchIndex;
-                });
-            }
-
-            updateChildrenLevels(nodeToMove.id, nodeToMove.level);
-            normalizeOrders();
-            renderEditor();
-            renderMindmap();
-        };
-
-        // Help functions for node structure
-        const getMaxDepth = nodeId => {
-            const node = mindmapData.find(n => n.id === nodeId);
-            if (!node) return 0;
-            const children = mindmapData.filter(n => n.parent === nodeId);
-            return children.length ? Math.max(...children.map(child => 1 + getMaxDepth(child.id))) : 0;
-        };
-
-        const isDescendant = (ancestorId, nodeId) => {
-            const node = mindmapData.find(n => n.id === nodeId);
-            if (!node || node.parent === null) return false;
-            return node.parent === ancestorId || isDescendant(ancestorId, node.parent);
-        };
-
-        const updateChildrenLevels = (nodeId, newLevel) => {
-            mindmapData.filter(n => n.parent === nodeId).forEach(child => {
-                child.level = newLevel + 1;
-                child.branchIndex = mindmapData.find(n => n.id === nodeId).branchIndex;
-                child.isCollapsed = child.level === 1 ? false : undefined;
-                updateChildrenLevels(child.id, child.level);
-            });
-        };
-
-        const normalizeOrders = () => {
-            const groups = {};
-            mindmapData.forEach(node => {
-                const key = node.parent === null ? 'root' : node.parent;
-                groups[key] = groups[key] || [];
-                groups[key].push(node);
-            });
-            Object.values(groups).forEach(group => {
-                group.sort((a, b) => (a.order || 0) - (b.order || 0) || a.id - b.id)
-                    .forEach((node, index) => node.order = index + 1000);
-            });
-        };
-
-        // Mermaid and SVG generation
-        const generateMermaidCode = () => {
-            if (!mindmapData.length) return 'mindmap|root(Hauptknoten)';
-            const rootNode = mindmapData.find(node => node.level === 0);
-            if (!rootNode) return 'mindmap|root(Hauptknoten)';
-            const addNodeToMermaid = (node, level = 0) => {
-                const indent = '~'.repeat(level);
-                const text = node.text.replace(/[]/g, '');
-                let nodeCode = node.level === 0 ? `${indent}root(${text})` : `${indent}${text}`;
-                const children = mindmapData.filter(child => child.parent === node.id).sort((a, b) => (a.order || 0) - (b.order || 0));
-                return nodeCode + children.map(child => '|' + addNodeToMermaid(child, level + 1)).join('');
-            };
-            return 'mindmap|' + addNodeToMermaid(rootNode);
-        };
-
-        const buildTreeFromData = () => {
-            const nodesMap = new Map(mindmapData.map(node => [node.id, { ...node, children: [] }]));
-            let root = null;
-            nodesMap.forEach(node => {
-                if (node.level === 0) root = node;
-                if (node.parent !== null) {
-                    const parent = nodesMap.get(node.parent);
-                    if (parent) parent.children.push(node);
-                }
-            });
-            const sortChildren = node => {
-                node.children.sort((a, b) => (a.order || 0) - (b.order || 0));
-                node.children.forEach(sortChildren);
-            };
-            if (root) sortChildren(root);
-            return root;
-        };
-
-        // Assign colors for branches
-        const assignBranchColors = node => {
-            const colorThemeSelect = document.getElementById('[[color_theme#id]]');
-            let selectedScheme = colorThemeSelect?.options[colorThemeSelect.selectedIndex]?.value || 'Standard';
-            node.color = node.level === 0 ? BRANCH_COLORS_SCHEMES[selectedScheme].level0 :
-                node.level < BRANCH_COLORS.length ? BRANCH_COLORS[node.level] : '#999';
-            node.textColor = getContrastTextColor(node.color);
-            node.borderColor = node.level === 0 ? BRANCH_COLORS_SCHEMES[selectedScheme].level0 : node.color;
-            node.children.forEach((child, index) => {
-                assignBranchColors(child);
-            });
-        };
-
-        const countNodes = node => 1 + node.children.reduce((sum, child) => sum + countNodes(child), 0);
-
-        // Calculate sub-tree size
-        const calculateSubtreeSize = (node) => {
-            const fontSize = Math.max(12, 18 - node.level);
-            const maxWidth = 200;
-            const words = node.text.split(' ').flatMap(word => {
-                if (measureTextWidth(word, fontSize) > maxWidth) {
-                    return splitLongWord(word, maxWidth, fontSize);
-                }
-                return word;
-            });
-            let line = '';
-            const lines = [];
-
-            words.forEach(word => {
-                const testLine = line + word + ' ';
-                if (measureTextWidth(testLine, fontSize) > maxWidth && line.length > 0) {
-                    lines.push(line.trim());
-                    line = word + ' ';
-                } else {
-                    line = testLine;
-                }
-            });
-            if (line.length > 0) lines.push(line.trim());
-
-            const lineHeight = fontSize * 1.2;
-            node.height = lines.length * lineHeight + 20;
-            node.width = Math.max(100, maxWidth + 20);
-
-            if (!node.children.length) {
-                node.subtreeWidth = node.width;
-                node.subtreeHeight = node.height;
-                return;
-            }
-            node.children.forEach(calculateSubtreeSize);
-            const spacing = Math.max(10, ...node.children.map(child => child.height * 0.5));
-            node.subtreeHeight = node.children.reduce((sum, child) => sum + child.subtreeHeight, 0) + Math.max(0, node.children.length - 1) * spacing;
-            node.subtreeWidth = node.width + 100 + Math.max(...node.children.map(c => c.subtreeWidth));
-        };
-
-        // Position nodes
-        const positionNode = (node, x, y, direction) => {
-            if (typeof node.x === 'undefined') {
-                node.x = direction === 'left' ? x - node.width : x;
-            }
-            node.y = y + (node.subtreeHeight - node.height) / 2;
-            const spacing = Math.max(10, ...node.children.map(child => child.height * 0.5));
-            let currentY = y;
-            node.children.sort((a, b) => (a.order || 0) - (b.order || 0));
-            node.children.forEach(child => {
-                const childDirection = child.direction || direction;
-                const offset = 100;
-                const childX = childDirection === 'right' ? node.x + node.width + offset : node.x - offset;
-                positionNode(child, childX, currentY, childDirection);
-                currentY += child.subtreeHeight + spacing;
-            });
-        };
-
-        // Calculate layout
-        const calculateLayout = (node, level = 0) => {
-            if (level === 0) {
-                calculateSubtreeSize(node);
-                let rightChildren = [];
-                let leftChildren = [];
-                node.children.sort((a, b) => (a.order || 0) - (b.order || 0));
-                node.children.forEach((child, index) => {
-                    child.direction = index % 2 === 0 ? 'right' : 'left';
-                    if (child.direction === 'right') rightChildren.push(child);
-                    else leftChildren.push(child);
-                });
-
-                const spacing = Math.max(10, ...node.children.map(child => child.height * 0.5));
-
-                let rightTotalHeight = rightChildren.reduce((sum, c) => sum + c.subtreeHeight, 0) + Math.max(0, rightChildren.length - 1) * spacing;
-                let leftTotalHeight = leftChildren.reduce((sum, c) => sum + c.subtreeHeight, 0) + Math.max(0, leftChildren.length - 1) * spacing;
-                let maxTotalHeight = Math.max(leftTotalHeight, rightTotalHeight, node.height);
-
-                const maxRightWidth = rightChildren.reduce((max, c) => Math.max(max, c.subtreeWidth), 0);
-                const maxLeftWidth = leftChildren.reduce((max, c) => Math.max(max, c.subtreeWidth), 0);
-                const maxBranchWidth = Math.max(maxRightWidth, maxLeftWidth);
-                const totalWidth = node.width + 2 * maxBranchWidth + 200;
-
-                node.x = maxBranchWidth + 100;
-                node.y = maxTotalHeight / 2 - node.height / 2;
-
-                let rightY = node.y + node.height / 2 - rightTotalHeight / 2;
-                rightChildren.forEach(child => {
-                    positionNode(child, node.x + node.width + 100, rightY, 'right');
-                    rightY += child.subtreeHeight + spacing;
-                });
-
-                let leftY = node.y + node.height / 2 - leftTotalHeight / 2;
-                leftChildren.forEach(child => {
-                    const rightEdgeX = node.x - 100;
-                    positionNode(child, rightEdgeX, leftY, 'left');
-                    leftY += child.subtreeHeight + spacing;
-                });
-            }
-        };
-
-        // Calculate connection points
-        const getConnectionPoint = (fromNode, toNode) => {
-            const fromCenterX = fromNode.x + fromNode.width / 2;
-            const fromCenterY = fromNode.y + fromNode.height / 2;
-            const toCenterX = toNode.x + toNode.width / 2;
-            const toCenterY = toNode.y + toNode.height / 2;
-            const dx = toCenterX - fromCenterX;
-            const dy = toCenterY - fromCenterY;
-            const distance = Math.sqrt(dx * dx + dy * dy);
-            const normalizedDx = dx / distance;
-            const normalizedDy = dy / distance;
-            return {
-                fromX: fromCenterX + normalizedDx * (fromNode.width / 2),
-                fromY: fromCenterY + normalizedDy * (fromNode.height / 2),
-                toX: toCenterX - normalizedDx * (toNode.width / 2),
-                toY: toCenterY - normalizedDy * (toNode.height / 2)
-            };
-        };
-
-        // Generate SVG
-        const generateSVG = root => {
-            if (!root) return '';
-            const padding = 100;
-            assignBranchColors(root);
-            calculateLayout(root);
-            const { minX, minY, maxX, maxY } = getBounds(root);
-            const width = maxX - minX + padding * 2;
-            const height = maxY - minY + padding * 2;
-            let svg = `<svg width="${width}" height="${height}" viewBox="${minX - padding} ${minY - padding} ${width} ${height}" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">`;
-            const drawConnections = node => {
-                node.children.forEach(child => {
-                    const { fromX, fromY, toX, toY } = getConnectionPoint(node, child);
-                    svg += `<line x1="${fromX}" y1="${fromY}" x2="${toX}" y2="${toY}" stroke="${BRANCH_COLORS[child.branchIndex % BRANCH_COLORS.length] || '#667eea'}" stroke-width="2" stroke-linecap="round"/>`;
-                    drawConnections(child);
-                });
-            };
-            const drawNodes = node => {
-                const colorThemeSelect = document.getElementById('[[color_theme#id]]');
-                let selectedScheme = colorThemeSelect?.options[colorThemeSelect.selectedIndex]?.value || 'Standard';
-                const { fillColor, fillOpacity, strokeColor, strokeWidth, strokeDasharray } = node.level === 0
-                    ? { fillColor: BRANCH_COLORS_SCHEMES[selectedScheme].level0, strokeColor: BRANCH_COLORS_SCHEMES[selectedScheme].level0, strokeWidth: 2, strokeDasharray: 'none' }
-                    : node.level === 1
-                        ? { fillColor: BRANCH_COLORS[node.branchIndex % BRANCH_COLORS.length], strokeColor: BRANCH_COLORS[node.branchIndex % BRANCH_COLORS.length], strokeWidth: 2, strokeDasharray: 'none' }
-                        : node.level === 2
-                            ? { fillColor: BRANCH_COLORS[node.branchIndex % BRANCH_COLORS.length], fillOpacity: '0.6', strokeColor: BRANCH_COLORS[node.branchIndex % BRANCH_COLORS.length], strokeWidth: 2, strokeDasharray: '5,3' }
-                            : { fillColor: '#ffffff', strokeColor: BRANCH_COLORS[node.branchIndex % BRANCH_COLORS.length], strokeWidth: 2, strokeDasharray: '5,3' };
-                const textColor = getContrastTextColor(fillColor);
-                svg += `<rect data-node-id="${node.id}" class="node-rect" x="${node.x}" y="${node.y}" width="${node.width}" height="${node.height}" rx="8" fill="${fillColor}" fill-opacity="${fillOpacity}" stroke="${strokeColor}" stroke-width="${strokeWidth}" stroke-dasharray="${strokeDasharray}"/>`;
-                const words = node.text.split(' ').flatMap(word => {
-                    const fontSize = Math.max(12, 18 - node.level);
-                    if (measureTextWidth(word, fontSize) > 200) {
-                        return splitLongWord(word, 200, fontSize);
-                    }
-                    return word;
-                });
-                let line = '';
-                const lines = [];
-                const maxWidth = 200;
-                const fontSize = Math.max(12, 18 - node.level);
-                words.forEach(word => {
-                    const testLine = line + word + ' ';
-                    if (measureTextWidth(testLine, fontSize) > maxWidth && line.length > 0) {
-                        lines.push(line.trim());
-                        line = word + ' ';
-                    } else {
-                        line = testLine;
-                    }
-                });
-                if (line.length > 0) lines.push(line.trim());
-                const lineHeight = fontSize * 1.2;
-                const totalTextHeight = lines.length * lineHeight;
-                const startY = node.y + (node.height - totalTextHeight) / 2 + lineHeight * 0.7;
-                lines.forEach((textLine, index) => {
-                    svg += `<text data-node-id="${node.id}" class="node-text" x="${node.x + node.width / 2}" y="${startY + index * lineHeight}" font-size="${fontSize}" font-family="Inter, system-ui, sans-serif" fill="${textColor}" text-anchor="middle" font-weight="${node.level === 0 ? '600' : '400'}">${textLine}</text>`;
-                });
-                node.children.forEach(drawNodes);
-            };
-            drawConnections(root);
-            drawNodes(root);
-            svg += '</svg>';
-            return svg;
-        };
-
-        // Grenzen berechnen
-        const getBounds = root => {
-            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-            const updateBounds = node => {
-                minX = Math.min(minX, node.x);
-                minY = Math.min(minY, node.y);
-                maxX = Math.max(maxX, node.x + node.width);
-                maxY = Math.max(maxY, node.y + node.height);
-                node.children.forEach(updateBounds);
-            };
-            updateBounds(root);
-            return { minX, minY, maxX, maxY };
-        };
-
-        // Render mind maps
-        const renderMindmap = () => {
-            if (!mermaidInput) return;
-            mermaidInput.value = generateMermaidCode();
-            if (!previewContainer) return;
-            previewContainer.innerHTML = '<div class="loading">Rendere Mindmap...</div>';
-            try {
-                const root = buildTreeFromData();
-                const svg = generateSVG(root);
-                previewContainer.innerHTML = `<div id="mermaid-container-${Date.now()}" class="mermaid-container">${svg}</div>`;
-                const existingOverlay = document.querySelector('.node-action-overlay, .input-overlay');
-                if (existingOverlay) existingOverlay.remove();
-                const svgContainer = previewContainer.querySelector('svg');
-                if (svgContainer) {
-                    svgContainer.addEventListener('click', (e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        const existingOverlay = document.querySelector('.node-action-overlay, .input-overlay');
-                        if (existingOverlay) existingOverlay.remove();
-                        const target = e.target.closest('[data-node-id]');
-                        if (target) {
-                            const nodeId = parseInt(target.getAttribute('data-node-id'));
-                            const node = mindmapData.find(n => n.id === nodeId);
-                            if (!node) {
-                                showErrorModal('Knoten nicht gefunden.');
-                                return;
-                            }
-                            if (node.level === 0 && !hasInteractedWithRoot) {
-                                hasInteractedWithRoot = true;
-                                if (welcomeMessage) welcomeMessage.style.display = 'none';
-                            }
-                            if (node.level === 0 && e.target.classList.contains('delete-btn')) {
-                                showErrorModal('Der Hauptknoten kann nicht gelöscht werden.');
-                                return;
-                            }
-                            const rects = svgContainer.querySelectorAll(`rect[data-node-id="${nodeId}"]`);
-                            const texts = svgContainer.querySelectorAll(`text[data-node-id="${nodeId}"]`);
-                            [rects, texts].forEach(elements => {
-                                elements.forEach(el => {
-                                    el.classList.add('node-highlighted');
-                                    setTimeout(() => el.classList.remove('node-highlighted'), 500);
-                                });
-                            });
-
-                            const rect = target.getBoundingClientRect();
-                            const zoomFactor = currentZoom || 1;
-                            const overlay = document.createElement('div');
-                            overlay.className = 'node-action-overlay';
-                            overlay.style.left = `${rect.left + window.scrollX}px`;
-                            overlay.style.top = `${rect.bottom + window.scrollY + 5}px`;
-                            overlay.innerHTML = `
-                                <button class="edit-btn" title="Knoten bearbeiten"><i class="fa-solid fa-edit"></i></button>
-                                <button class="plus-btn" title="Neuer Unterknoten"><i class="fa-solid fa-plus"></i></button>
-                                <button class="delete-btn" title="Knoten löschen"><i class="fa-solid fa-trash"></i></button>
-                            `;
-                            document.body.appendChild(overlay);
-                            overlay.querySelector('.edit-btn').addEventListener('click', (e) => {
-                                e.stopPropagation();
-                                overlay.remove();
-                                const inputOverlay = document.createElement('div');
-                                inputOverlay.className = 'input-overlay';
-                                const overlayWidth = (rect.width / zoomFactor) * 1;
-                                inputOverlay.style.left = `${rect.left + window.scrollX - (overlayWidth - rect.width / zoomFactor) / 2}px`;
-                                inputOverlay.style.top = `${rect.top + window.scrollY}px`;
-                                inputOverlay.style.width = `${overlayWidth}px`;
-                                inputOverlay.style.height = `${rect.height / zoomFactor}px`;
-                                const input = document.createElement('input');
-                                input.type = 'text';
-                                input.value = node.text;
-                                const colorThemeSelect = document.getElementById('[[color_theme#id]]');
-                                let selectedScheme = colorThemeSelect?.options[colorThemeSelect.selectedIndex]?.value || 'Standard';
-                                const inputBackgroundColor = node.level === 0 ? BRANCH_COLORS_SCHEMES[selectedScheme].level0 :
-                                    node.level === 1 ? BRANCH_COLORS[node.branchIndex % BRANCH_COLORS.length] :
-                                        node.level === 2 ? BRANCH_COLORS[node.branchIndex % BRANCH_COLORS.length] :
-                                            '#ffffff';
-                                input.style.backgroundColor = inputBackgroundColor;
-                                input.style.color = getContrastTextColor(inputBackgroundColor);
-                                inputOverlay.appendChild(input);
-                                document.body.appendChild(inputOverlay);
-                                input.focus();
-                                input.select();
-
-                                let isSaving = false;
-
-                                input.addEventListener('input', () => {
-                                    validateInputLength(input, nodeId);
-                                });
-
-                                const saveInput = () => {
-                                    if (isSaving) return;
-                                    isSaving = true;
-                                    if (validateNodeText(input.value, input)) {
-                                        updateNodeText(nodeId, input.value, input);
-                                        renderEditor();
-                                    }
-                                    if (inputOverlay.isConnected) {
-                                        inputOverlay.remove();
-                                    }
-                                    document.removeEventListener('click', closeInputOverlay);
-                                    isSaving = false;
-                                };
-
-                                input.addEventListener('blur', saveInput);
-                                input.addEventListener('keydown', (e) => {
-                                    if (e.key === 'Enter' || e.keyCode === 13) {
-                                        e.preventDefault();
-                                        saveInput();
-                                    }
-                                });
-
-                                const closeInputOverlay = (e) => {
-                                    if (!inputOverlay.contains(e.target)) {
-                                        saveInput();
-                                    }
-                                };
-                                document.addEventListener('click', closeInputOverlay);
-                            });
-                            overlay.querySelector('.plus-btn').addEventListener('click', (e) => {
-                                e.stopPropagation();
-                                if (!node || node.id !== nodeId) {
-                                    showErrorModal('Fehler: Ungültiger Knoten ausgewählt.');
-                                    overlay.remove();
-                                    return;
-                                }
-                                if (node.level >= MAX_LEVEL) {
-                                    showErrorModal(`Die maximale Tiefe von ${MAX_LEVEL} Ebenen wurde erreicht.`);
-                                    overlay.remove();
-                                    return;
-                                }
-                                const children = mindmapData.filter(n => n.parent === nodeId);
-                                if (children.length >= MAX_CHILDREN_PER_NODE) {
-                                    showErrorModal(`Der Elternknoten hat bereits die maximale Anzahl von ${MAX_CHILDREN_PER_NODE} Unterknoten erreicht.`);
-                                    overlay.remove();
-                                    return;
-                                }
-                                addChildNode(nodeId, true);
-                                overlay.remove();
-                            });
-                            overlay.querySelector('.delete-btn').addEventListener('click', (e) => {
-                                e.stopPropagation();
-                                overlay.remove();
-                                showDeleteModal(nodeId);
-                            });
-                            const closeOverlay = (e) => {
-                                if (!overlay.contains(e.target) && !target.contains(e.target)) {
-                                    overlay.remove();
-                                    document.removeEventListener('click', closeOverlay);
-                                }
-                            };
-                            document.addEventListener('click', closeOverlay);
-                        }
-                    });
-                }
-                if (welcomeMessage && typeof hasInteractedWithRoot !== 'undefined' && !hasInteractedWithRoot && !mindmapData.some(node => node.parent !== null)) {
-                    welcomeMessage.style.display = 'block';
-                } else if (welcomeMessage) {
-                    welcomeMessage.style.display = 'none';
-                }
-            } catch (error) {
-                const mermaidCode = mermaidInput.value.split('|').map(line => {
-                    const match = line.match(/^(~*)[^~]*/);
-                    return match ? ' '.repeat(match[1]?.length || 0) + match[0].replace(/^~*/, '') : line;
-                }).join('\n');
-                previewContainer.innerHTML = `
-                    <div style="background: #f1f3f4; padding: 20px; border-radius: 12px; border-left: 4px solid #dc2626;">
-                        <h4 style="margin: 0 0 10px 0; color: #dc2626;">⚠️ Vorschau nicht verfügbar</h4>
-                        <p style="color: #6b7280; margin: 0 0 15px 0; font-size: 14px;">Rendering-Fehler: ${error.message}</p>
-                        <h5 style="margin: 15px 0 10px 0; color: #1f2937;">📋 Generierter Code:</h5>
-                        <pre style="background: white; padding: 15px; border-radius: 8px; font-family: 'Courier New', monospace; font-size: 13px; line-height: 1.4; overflow-x: auto; margin: 0; border: 1px solid #e5e7eb;">${mermaidCode}</pre>
-                    </div>
-                `;
-                if (welcomeMessage) welcomeMessage.style.display = 'none';
-            }
-        };
-
-        function togglePresentationMode() {
-            const fsContainer = document.getElementById("fullscreen_mindmap");
-            const previewPanel = document.querySelector('.preview-panel');
-            const toggleButton = document.querySelector('.toggle-fullscreen-btn');
-
-            if (fsContainer.classList.contains('fullscreen-mode')) {
-                fsContainer.classList.remove('fullscreen-mode');
-                previewPanel.style.overflow = 'auto';
-                resetZoom();
-            } else {
-                fsContainer.classList.add('fullscreen-mode');
-                previewPanel.style.overflow = 'hidden';
-            }
-        }
-
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && document.getElementById("fullscreen_mindmap").classList.contains('fullscreen-mode')) {
-                togglePresentationMode();
-            }
-        });
-
-      
-
- 
-    </script>
+  </div>
 </div>
+
+<div class="modal fade" id="conceptMapModal" tabindex="-1" aria-labelledby="conceptMapModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable modal-lg">
+    <div class="modal-content">
+      <div class="modal-header bg-primary text-white">
+        <h5 class="modal-title" id="conceptMapModalLabel">So erstellst du eine Concept Map</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Schließen"></button>
+      </div>
+      <div class="modal-body">
+        <h6>1. Thema festlegen</h6>
+        <p>Wähle ein Thema, das du darstellen möchtest, z. B. <em>Jahreszeiten</em> oder <em>Wasser</em>.</p>
+        <h6>2. Begriffe sammeln</h6>
+        <p>Schreibe alle wichtigen Begriffe auf, die dir zu deinem Thema einfallen.</p>
+        <h6>3. Begriffe ordnen</h6>
+        <p>Platziere den zentralen Begriff in die Mitte und ordne verwandte Begriffe drumherum.</p>
+        <h6>4. Beziehungen beschriften</h6>
+        <p>Verbinde Begriffe mit Pfeilen und beschrifte die Pfeile mit Verben:</p>
+        <ul>
+          <li>Sonne <em>erwärmt</em> Erde</li>
+          <li>Wärme <em>führt zu</em> Sommer</li>
+          <li>Kälte <em>führt zu</em> Winter</li>
+          <li>Regen <em>entsteht durch</em> Wolken</li>
+          <li>Pflanzenwachstum <em>nimmt zu bei</em> Wärme</li>
+        </ul>
+        <h6>5. Farben für Kategorien</h6>
+        <p>Verwende Farben, um Gruppen zu kennzeichnen:</p>
+        <ul>
+          <li><span style="color:goldenrod">Gelb</span> = Energie & Sonne</li>
+          <li><span style="color:royalblue">Blau</span> = Wetter & Klima</li>
+          <li><span style="color:green">Grün</span> = Natur & Wachstum</li>
+          <li><span style="color:purple">Violett</span> = Zeitabschnitte</li>
+        </ul>
+        <h6>6. Überprüfen</h6>
+        <p>Lies deine Concept Map laut vor – ergibt jeder Pfeil eine sinnvolle Aussage?</p>
+        <hr />
+        <p class="text-muted text-center"> Tipp: Farben zeigen Kategorien, Pfeile zeigen Beziehungen. Zusammen ergibt das Wissen mit Struktur! </p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Schließen</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const canvas = document.querySelector('.conceptmap #canvas');
+  const svg = document.querySelector('.conceptmap #svg');
+  const jsonInput = document.querySelector('.conceptmap #[[code#id]]');
+let isSelecting = false;  // Flag, um Drags während Select zu blocken
+let selectTimeout = null; // Timeout für Click-Intent-Erkennung
+let dragThreshold = 10;   // Neu: Erhöhte Schwelle (von 5 auf 10px), ignoriert Zucken
+  let nodes = [];
+  let connections = [];
+  let connectStart = null;
+  let draggedNode = null;
+  let draggedControl = null;
+  let potentialDraggedControl = null;
+  let dragStartPos = { x: 0, y: 0 };
+  let hasMoved = false;
+  let selectedNode = null;
+  let selectedConnection = null;
+  let nodeIdCounter = 1;
+  let connectionIdCounter = 1;
+  let lastTapTime = 0;
+
+  // SVG Pfeilspitze definieren
+  svg.innerHTML = `
+    <defs>
+      <marker id="arrowhead" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+        <polygon points="0 0, 8 4, 0 8" fill="#2c3e50" />
+      </marker>
+    </defs>
+  `;
+
+  // Initialisierung: JSON aus Input laden
+  window.addEventListener('load', () => {
+    if (jsonInput.value.trim()) {
+      loadFromJSON(jsonInput.value);
+    }
+  });
+
+  // Funktion zum Berechnen des Randpunkts
+  function getBorderPoint(lineStartX, lineStartY, lineEndX, lineEndY, rect, canvasRect) {
+    const dx = lineEndX - lineStartX;
+    const dy = lineEndY - lineStartY;
+    const left = rect.left - canvasRect.left;
+    const top = rect.top - canvasRect.top;
+    const right = left + rect.width;
+    const bottom = top + rect.height;
+    const intersections = [];
+
+    if (dx !== 0) {
+      const t = (left - lineStartX) / dx;
+      if (t > 0 && t <= 1) {
+        const y = lineStartY + t * dy;
+        if (y >= top && y <= bottom) intersections.push({x: left, y, t});
+      }
+    }
+
+    if (dx !== 0) {
+      const t = (right - lineStartX) / dx;
+      if (t > 0 && t <= 1) {
+        const y = lineStartY + t * dy;
+        if (y >= top && y <= bottom) intersections.push({x: right, y, t});
+      }
+    }
+
+    if (dy !== 0) {
+      const t = (top - lineStartY) / dy;
+      if (t > 0 && t <= 1) {
+        const x = lineStartX + t * dx;
+        if (x >= left && x <= right) intersections.push({x, y: top, t});
+      }
+    }
+
+    if (dy !== 0) {
+      const t = (bottom - lineStartY) / dy;
+      if (t > 0 && t <= 1) {
+        const x = lineStartX + t * dx;
+        if (x >= left && x <= right) intersections.push({x, y: bottom, t});
+      }
+    }
+
+    if (intersections.length > 0) {
+      intersections.sort((a, b) => a.t - b.t);
+      return intersections[0];
+    }
+    return {x: lineEndX, y: lineEndY};
+  }
+
+  let mode = 'default';
+
+  // Hilfsfunktion für Double-Tap-Erkennung
+  function isDoubleTap() {
+    const currentTime = Date.now();
+    const tapLength = currentTime - lastTapTime;
+    lastTapTime = currentTime;
+    return tapLength < 500 && tapLength > 0;
+  }
+
+  // Touch drag handler factory
+  function createTouchDragHandler(isNode = true) {
+    return function touchMoveHandler(e) {
+      const touch = e.touches[0];
+      if (isNode && draggedNode) {
+        const deltaX = Math.abs(touch.clientX - dragStartPos.x);
+        const deltaY = Math.abs(touch.clientY - dragStartPos.y);
+        
+        if (deltaX > 5 || deltaY > 5) {
+          e.preventDefault();
+          hasMoved = true;
+          const canvasRect = canvas.getBoundingClientRect();
+          const nodeRect = draggedNode.element.getBoundingClientRect();
+          let newX = touch.clientX - canvasRect.left - (nodeRect.width / 2);
+          let newY = touch.clientY - canvasRect.top - (nodeRect.height / 2);
+
+          newX = Math.max(0, Math.min(newX, canvasRect.width - nodeRect.width));
+          newY = Math.max(0, Math.min(newY, canvasRect.height - nodeRect.height));
+
+          draggedNode.x = newX;
+          draggedNode.y = newY;
+          draggedNode.element.style.left = newX + 'px';
+          draggedNode.element.style.top = newY + 'px';
+          const rect = draggedNode.element.getBoundingClientRect();
+          draggedNode.connectBtn.style.left = `${rect.right - canvasRect.left}px`;
+          draggedNode.connectBtn.style.top = `${rect.top - canvasRect.top - 18}px`;
+          renderConnections();
+        }
+      } else if (draggedControl) {
+        const deltaX = Math.abs(touch.clientX - dragStartPos.x);
+        const deltaY = Math.abs(touch.clientY - dragStartPos.y);
+        
+        if (deltaX > 5 || deltaY > 5) {
+          e.preventDefault();
+          draggedControl.isDragging = true;
+          const canvasRect = canvas.getBoundingClientRect();
+          let newX = touch.clientX - canvasRect.left;
+          let newY = touch.clientY - canvasRect.top;
+
+          newX = Math.max(0, Math.min(newX, canvasRect.width));
+          newY = Math.max(0, Math.min(newY, canvasRect.height));
+
+          const fromNode = nodes.find(n => n.id === draggedControl.from);
+          const toNode = nodes.find(n => n.id === draggedControl.to);
+          if (fromNode && toNode) {
+            const fromRect = fromNode.element.getBoundingClientRect();
+            const toRect = toNode.element.getBoundingClientRect();
+            const x1 = fromRect.left + fromRect.width / 2 - canvasRect.left;
+            const y1 = fromRect.top + fromRect.height / 2 - canvasRect.top;
+            const x2 = toRect.left + toRect.width / 2 - canvasRect.left;
+            const y2 = toRect.top + toRect.height / 2 - canvasRect.top;
+            
+            let startPoint = getBorderPoint(x1, y1, x2, y2, fromRect, canvasRect) || {x: x1, y: y1};
+            let endPoint = getBorderPoint(x2, y2, x1, y1, toRect, canvasRect) || {x: x2, y: y2};
+
+            const t = 0.5;
+            draggedControl.controlX = (newX - (1 - t) ** 2 * startPoint.x - t ** 2 * endPoint.x) / (2 * (1 - t) * t);
+            draggedControl.controlY = (newY - (1 - t) ** 2 * startPoint.y - t ** 2 * endPoint.y) / (2 * (1 - t) * t);
+          }
+
+          dragStartPos.x = touch.clientX;
+          dragStartPos.y = touch.clientY;
+          renderConnections();
+          saveToJSON();
+        }
+      } else if (potentialDraggedControl) {
+        const deltaX = Math.abs(touch.clientX - dragStartPos.x);
+        const deltaY = Math.abs(touch.clientY - dragStartPos.y);
+        
+        if (deltaX > 5 || deltaY > 5) {
+          e.preventDefault();
+          hasMoved = true;
+          draggedControl = potentialDraggedControl;
+          potentialDraggedControl = null;
+          draggedControl.isDragging = true;
+          const canvasRect = canvas.getBoundingClientRect();
+          let newX = touch.clientX - canvasRect.left;
+          let newY = touch.clientY - canvasRect.top;
+
+          newX = Math.max(0, Math.min(newX, canvasRect.width));
+          newY = Math.max(0, Math.min(newY, canvasRect.height));
+
+          const fromNode = nodes.find(n => n.id === draggedControl.from);
+          const toNode = nodes.find(n => n.id === draggedControl.to);
+          if (fromNode && toNode) {
+            const fromRect = fromNode.element.getBoundingClientRect();
+            const toRect = toNode.element.getBoundingClientRect();
+            const x1 = fromRect.left + fromRect.width / 2 - canvasRect.left;
+            const y1 = fromRect.top + fromRect.height / 2 - canvasRect.top;
+            const x2 = toRect.left + toRect.width / 2 - canvasRect.left;
+            const y2 = toRect.top + toRect.height / 2 - canvasRect.top;
+            
+            let startPoint = getBorderPoint(x1, y1, x2, y2, fromRect, canvasRect) || {x: x1, y: y1};
+            let endPoint = getBorderPoint(x2, y2, x1, y1, toRect, canvasRect) || {x: x2, y: y2};
+
+            const t = 0.5;
+            draggedControl.controlX = (newX - (1 - t) ** 2 * startPoint.x - t ** 2 * endPoint.x) / (2 * (1 - t) * t);
+            draggedControl.controlY = (newY - (1 - t) ** 2 * startPoint.y - t ** 2 * endPoint.y) / (2 * (1 - t) * t);
+          }
+
+          dragStartPos.x = touch.clientX;
+          dragStartPos.y = touch.clientY;
+          renderConnections();
+        }
+      }
+    };
+  }
+
+  function createTouchEndHandler() {
+  return function touchEndHandler(e) {
+    if (draggedNode) {
+      if (hasMoved) {
+        saveToJSON();
+      }
+      draggedNode = null;
+      hasMoved = false;
+    }
+    if (draggedControl) {
+      if (draggedControl.isDragging) {
+        saveToJSON();
+      }
+      draggedControl.isDragging = false;
+      draggedControl = null;
+    }
+
+    potentialDraggedControl = null;
+  };
+}
+
+// FIX: Zentraler Touch-Handler, der bei Berührung AUSSERHALB der Elemente den Zustand zurücksetzt.
+// Korrektur: Berücksichtigt jetzt auch die Steuerelemente und den Verbindungs-Button.
+document.addEventListener('touchstart', (e) => {
+  const target = e.target;
+  const isCanvasElement = target === canvas || target === svg;
+  const isNodeElement = target.closest('.node');
+  const isLabelElement = target.closest('.connection-label');
+  // FIX: Prüfen, ob das Ziel eines der Steuerelemente ODER der Verbindungs-Button ist
+  const isControlElement = target.closest('.conceptmap #addNode, .conceptmap #deleteMode, .conceptmap #clearAll, .conceptmap .color-button, .node-connect-btn');
+
+  // Nur zurücksetzen, wenn die Berührung außerhalb ALLER interaktiven Elemente liegt
+  if (!isCanvasElement && !isNodeElement && !isLabelElement && !isControlElement) {
+    // Vollständiger Reset aller Interaktionszustände
+    isSelecting = false;
+    clearTimeout(selectTimeout);
+    connectStart = null;
+    draggedNode = null;
+    draggedControl = null;
+    potentialDraggedControl = null;
+    hasMoved = false;
+
+    if (selectedNode) {
+      selectedNode.element.classList.remove('selected');
+      selectedNode.connectBtn.style.display = 'none';
+      selectedNode = null;
+    }
+    if (selectedConnection) {
+      selectedConnection = null;
+      renderConnections();
+    }
+  }
+}, { passive: true });
+
+  // Node erstellen
+  function createNode(x, y, text = 'Neues Element', id = null, backgroundColor = 'white') {
+    const node = document.createElement('div');
+    node.className = 'node';
+    node.style.left = x + 'px';
+    node.style.top = y + 'px';
+    node.style.backgroundColor = backgroundColor;
+    node.style.zIndex = '10';
+    node.style.maxWidth = '200px';
+    node.style.wordWrap = 'break-word';
+    node.style.overflowWrap = 'break-word';
+    
+    const nodeText = document.createElement('div');
+    nodeText.className = 'node-text';
+    nodeText.textContent = text;
+    nodeText.style.width = '100%';
+    nodeText.style.wordWrap = 'break-word';
+    nodeText.style.overflowWrap = 'break-word';
+    nodeText.style.whiteSpace = 'normal';
+    nodeText.style.lineHeight = '1.2';
+    nodeText.style.padding = '8px';
+    node.appendChild(nodeText);
+
+    const connectBtn = document.createElement('button');
+    connectBtn.setAttribute('type', 'button');
+    connectBtn.className = 'node-connect-btn';
+    connectBtn.textContent = '+';
+    connectBtn.title = 'Verbindung erstellen';
+    canvas.appendChild(connectBtn);
+
+    const nodeData = {
+      id: id || nodeIdCounter++,
+      element: node,
+      connectBtn: connectBtn,
+      x: x,
+      y: y,
+      backgroundColor: backgroundColor
+    };
+    
+    nodes.push(nodeData);
+    canvas.appendChild(node);
+
+    function updateConnectBtnPosition() {
+      const rect = node.getBoundingClientRect();
+      const canvasRect = canvas.getBoundingClientRect();
+      connectBtn.style.left = `${rect.right - canvasRect.left}px`;
+      connectBtn.style.top = `${rect.top - canvasRect.top - 18}px`;
+    }
+    updateConnectBtnPosition();
+    node.addEventListener('mousemove', updateConnectBtnPosition);
+    window.addEventListener('resize', updateConnectBtnPosition);
+
+    connectBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      handleConnect(nodeData);
+    });
+
+    node.addEventListener('mousedown', (e) => {
+      e.stopPropagation();
+      draggedNode = nodeData;
+      hasMoved = false;
+      dragStartPos.x = e.clientX;
+      dragStartPos.y = e.clientY;
+    }, { passive: true });
+
+    node.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (!hasMoved) {
+        selectNode(nodeData);
+        if (connectStart && connectStart !== nodeData) {
+          handleConnect(nodeData);
+        }
+      }
+    });
+
+    node.addEventListener('dblclick', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      console.log('Doppelklick auf Node (Mouse):', nodeData.id);
+      selectAndEditNode(nodeData);
+    });
+
+    let nodeLastTap = 0;
+    node.addEventListener('touchstart', (e) => {
+      e.stopPropagation();
+      const touch = e.touches[0];
+      const currentTime = Date.now();
+      const tapLength = currentTime - nodeLastTap;
+      if (tapLength < 500 && tapLength > 0) {
+        console.log('Double-Tap auf Node (Touch):', nodeData.id);
+        selectAndEditNode(nodeData);
+      } else {
+        draggedNode = nodeData;
+        hasMoved = false;
+        dragStartPos.x = touch.clientX;
+        dragStartPos.y = touch.clientY;
+
+        const touchMoveHandler = createTouchDragHandler(true);
+        const touchEndHandler = createTouchEndHandler();
+        document.addEventListener('touchmove', touchMoveHandler, { passive: false });
+        document.addEventListener('touchend', touchEndHandler, { passive: true });
+
+        const globalTouchEnd = () => {
+          document.removeEventListener('touchmove', touchMoveHandler);
+          document.removeEventListener('touchend', touchEndHandler);
+          document.removeEventListener('touchend', globalTouchEnd);
+        };
+        document.addEventListener('touchend', globalTouchEnd, { once: true });
+      }
+      nodeLastTap = currentTime;
+    }, { passive: false });
+
+    return nodeData;
+  }
+
+  // Node auswählen
+  function selectNode(nodeData) {
+    if (selectedNode && selectedNode !== nodeData) {
+      selectedNode.element.classList.remove('selected');
+      selectedNode.connectBtn.style.display = 'none';
+    }
+    selectedNode = nodeData;
+    nodeData.element.classList.add('selected');
+    nodeData.connectBtn.style.display = 'block';
+    selectedConnection = null;
+    renderConnections();
+  }
+
+  // Node auswählen und editieren
+  function selectAndEditNode(nodeData) {
+    console.log('selectAndEditNode aufgerufen für Node:', nodeData.id);
+    selectNode(nodeData);
+
+    if (connectStart) {
+      connectStart.element.classList.remove('connecting');
+      connectStart = null;
+      canvas.classList.remove('connecting');
+    }
+
+    const nodeText = nodeData.element.querySelector('.node-text');
+    const rect = nodeText.getBoundingClientRect();
+    const canvasRect = canvas.getBoundingClientRect();
+
+    nodeText.style.visibility = 'hidden';
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'node-text-input';
+    input.value = nodeText.textContent || '';
+    input.maxLength = 200;
+    input.style.position = 'absolute';
+    input.style.left = `${rect.left - canvasRect.left}px`;
+    input.style.top = `${rect.top - canvasRect.top}px`;
+    input.style.width = `${rect.width}px`;
+    input.style.height = `${rect.height}px`;
+    input.style.border = 'none';
+    input.style.background = 'transparent';
+    input.style.font = window.getComputedStyle(nodeText).font;
+    input.style.textAlign = window.getComputedStyle(nodeText).textAlign;
+    input.style.padding = '0';
+    input.style.margin = '0';
+    input.style.zIndex = '20';
+    canvas.appendChild(input);
+
+    input.focus();
+    input.select();
+
+    input.addEventListener('input', (e) => {
+      if (input.value.length >= input.maxLength) {
+        alert(`Maximale Länge von ${input.maxLength} Zeichen erreicht!`);
+      }
+    });
+
+    const saveInput = () => {
+      nodeText.textContent = input.value.trim();
+      input.remove();
+      nodeText.style.visibility = 'visible';
+      saveToJSON();
+    };
+
+    input.addEventListener('blur', saveInput);
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        input.blur();
+      }
+    });
+
+    nodeData.element.addEventListener('dblclick', (e) => {
+      e.stopPropagation();
+    }, { once: true });
+  }
+
+  // Verbindung starten oder erstellen
+  function handleConnect(nodeData) {
+    if (!connectStart) {
+      connectStart = nodeData;
+      nodeData.element.classList.add('connecting');
+      canvas.classList.add('connecting');
+    } else {
+      if (connectStart.id !== nodeData.id) {
+        const fromRect = connectStart.element.getBoundingClientRect();
+        const toRect = nodeData.element.getBoundingClientRect();
+        const canvasRect = canvas.getBoundingClientRect();
+        const x1 = fromRect.left + fromRect.width / 2 - canvasRect.left;
+        const y1 = fromRect.top + fromRect.height / 2 - canvasRect.top;
+        const x2 = toRect.left + toRect.width / 2 - canvasRect.left;
+        const y2 = toRect.top + toRect.height / 2 - canvasRect.top;
+
+        const startPoint = getBorderPoint(x1, y1, x2, y2, fromRect, canvasRect) || {x: x1, y: y1};
+        const endPoint = getBorderPoint(x2, y2, x1, y1, toRect, canvasRect) || {x: x2, y: y2};
+
+        const controlX = (startPoint.x + endPoint.x) / 2;
+        const controlY = (startPoint.y + endPoint.y) / 2;
+
+        createConnection(connectStart, nodeData, '', controlX, controlY);
+      }
+      connectStart.element.classList.remove('connecting');
+      canvas.classList.remove('connecting');
+      connectStart = null;
+    }
+  }
+
+  function createConnection(from, to, label = '', controlX, controlY, id = null) {
+    const conn = {
+      id: id || connectionIdCounter++,
+      from: from.id,
+      to: to.id,
+      label: label,
+      labelElement: null,
+      controlX: controlX,
+      controlY: controlY,
+      isDragging: false
+    };
+    connections.push(conn);
+    renderConnections();
+    saveToJSON();
+  }
+
+  // Verbindungen zeichnen
+  function renderConnections() {
+    while (svg.children.length > 1) {
+      svg.removeChild(svg.lastChild);
+    }
+
+    connections.forEach(conn => {
+      const fromNode = nodes.find(n => n.id === conn.from);
+      const toNode = nodes.find(n => n.id === conn.to);
+      
+      if (!fromNode || !toNode) return;
+
+      const fromRect = fromNode.element.getBoundingClientRect();
+      const toRect = toNode.element.getBoundingClientRect();
+      const canvasRect = canvas.getBoundingClientRect();
+
+      const x1 = fromRect.left + fromRect.width / 2 - canvasRect.left;
+      const y1 = fromRect.top + fromRect.height / 2 - canvasRect.top;
+      const x2 = toRect.left + toRect.width / 2 - canvasRect.left;
+      const y2 = toRect.top + toRect.height / 2 - canvasRect.top;
+
+      let startPoint = getBorderPoint(x1, y1, x2, y2, fromRect, canvasRect);
+      if (!startPoint) startPoint = {x: x1, y: y1};
+      let endPoint = getBorderPoint(x2, y2, x1, y1, toRect, canvasRect);
+      if (!endPoint) endPoint = {x: x2, y: y2};
+
+      const startX = startPoint.x;
+      const startY = startPoint.y;
+      const endX = endPoint.x;
+      const endY = endPoint.y;
+      const controlX = conn.controlX;
+      const controlY = conn.controlY;
+
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      const d = `M ${startX} ${startY} Q ${controlX} ${controlY} ${endX} ${endY}`;
+      path.setAttribute('d', d);
+      path.setAttribute('class', 'connection');
+      if (selectedConnection === conn) {
+        path.classList.add('selected');
+      }
+  path.addEventListener('click', (e) => {
+  e.preventDefault();  // FIX: Verhindert Safari's synthetische Events
+  e.stopPropagation();
+  if (!isSelecting && !hasMoved) {  // FIX: Zusätzlicher Check
+    selectConnection(conn);
+  }
+});
+      svg.appendChild(path);
+
+      const t = 0.5;
+      const labelX = (1 - t) ** 2 * startX + 2 * (1 - t) * t * controlX + t ** 2 * endX;
+      const labelY = (1 - t) ** 2 * startY + 2 * (1 - t) * t * controlY + t ** 2 * endY;
+
+      if (!conn.labelElement) {
+        const labelDiv = document.createElement('div');
+        labelDiv.className = 'connection-label';
+        labelDiv.textContent = conn.label || '';
+        if (!conn.label) labelDiv.classList.add('empty');
+        labelDiv.style.left = `${labelX - 50}px`;
+        labelDiv.style.top = `${labelY - 10}px`;
+        canvas.appendChild(labelDiv);
+        conn.labelElement = labelDiv;
+        attachLabelEvents(labelDiv, conn);
+      } else {
+        conn.labelElement.style.left = `${labelX - 50}px`;
+        conn.labelElement.style.top = `${labelY - 10}px`;
+        if (conn.labelElement.tagName === 'DIV') {
+          conn.labelElement.textContent = conn.label || '';
+          if (!conn.label) {
+            conn.labelElement.classList.add('empty');
+          } else {
+            conn.labelElement.classList.remove('empty');
+          }
+        }
+      }
+    });
+  }
+
+function selectConnection(conn) {
+  isSelecting = true;
+  clearTimeout(selectTimeout);
+  selectTimeout = setTimeout(() => {
+    isSelecting = false;
+  }, 300);
+
+  // FIX: Sofort Drags resetten, um Leaks zu verhindern
+  potentialDraggedControl = null;
+  draggedControl = null;
+  hasMoved = false;
+
+  selectedConnection = conn;
+  if (selectedNode) {
+    selectedNode.element.classList.remove('selected');
+    selectedNode.connectBtn.style.display = 'none';
+    selectedNode = null;
+  }
+  renderConnections();
+}
+
+  function deleteNode(nodeData) {
+    const connectionsToDelete = connections.filter(c => c.from === nodeData.id || c.to === nodeData.id);
+    connectionsToDelete.forEach(c => {
+      if (c.labelElement) {
+        c.labelElement.remove();
+      }
+    });
+    connections = connections.filter(c => c.from !== nodeData.id && c.to !== nodeData.id);
+    nodes = nodes.filter(n => n.id !== nodeData.id);
+    nodeData.element.remove();
+    nodeData.connectBtn.remove();
+    renderConnections();
+    saveToJSON();
+  }
+
+  function deleteConnection(conn) {
+    if (conn.labelElement) {
+      conn.labelElement.remove();
+    }
+    connections = connections.filter(c => c.id !== conn.id);
+    renderConnections();
+    saveToJSON();
+  }
+
+  document.addEventListener('mousemove', (e) => {
+    if (draggedNode) {
+      const deltaX = Math.abs(e.clientX - dragStartPos.x);
+      const deltaY = Math.abs(e.clientY - dragStartPos.y);
+      
+      if (deltaX > 5 || deltaY > 5) {
+        hasMoved = true;
+        const canvasRect = canvas.getBoundingClientRect();
+        const nodeRect = draggedNode.element.getBoundingClientRect();
+        let newX = e.clientX - canvasRect.left - (nodeRect.width / 2);
+        let newY = e.clientY - canvasRect.top - (nodeRect.height / 2);
+
+        newX = Math.max(0, Math.min(newX, canvasRect.width - nodeRect.width));
+        newY = Math.max(0, Math.min(newY, canvasRect.height - nodeRect.height));
+
+        draggedNode.x = newX;
+        draggedNode.y = newY;
+        draggedNode.element.style.left = newX + 'px';
+        draggedNode.element.style.top = newY + 'px';
+        const rect = draggedNode.element.getBoundingClientRect();
+        draggedNode.connectBtn.style.left = `${rect.right - canvasRect.left}px`;
+        draggedNode.connectBtn.style.top = `${rect.top - canvasRect.top - 18}px`;
+        renderConnections();
+      }
+    } else if (draggedControl) {
+      const deltaX = Math.abs(e.clientX - dragStartPos.x);
+      const deltaY = Math.abs(e.clientY - dragStartPos.y);
+      
+      if (deltaX > 5 || deltaY > 5) {
+        draggedControl.isDragging = true;
+        const canvasRect = canvas.getBoundingClientRect();
+        let newX = e.clientX - canvasRect.left;
+        let newY = e.clientY - canvasRect.top;
+
+        newX = Math.max(0, Math.min(newX, canvasRect.width));
+        newY = Math.max(0, Math.min(newY, canvasRect.height));
+
+        const fromNode = nodes.find(n => n.id === draggedControl.from);
+        const toNode = nodes.find(n => n.id === draggedControl.to);
+        if (fromNode && toNode) {
+          const fromRect = fromNode.element.getBoundingClientRect();
+          const toRect = toNode.element.getBoundingClientRect();
+          const x1 = fromRect.left + fromRect.width / 2 - canvasRect.left;
+          const y1 = fromRect.top + fromRect.height / 2 - canvasRect.top;
+          const x2 = toRect.left + toRect.width / 2 - canvasRect.left;
+          const y2 = toRect.top + toRect.height / 2 - canvasRect.top;
+          
+          let startPoint = getBorderPoint(x1, y1, x2, y2, fromRect, canvasRect) || {x: x1, y: y1};
+          let endPoint = getBorderPoint(x2, y2, x1, y1, toRect, canvasRect) || {x: x2, y: y2};
+
+          const t = 0.5;
+          draggedControl.controlX = (newX - (1 - t) ** 2 * startPoint.x - t ** 2 * endPoint.x) / (2 * (1 - t) * t);
+          draggedControl.controlY = (newY - (1 - t) ** 2 * startPoint.y - t ** 2 * endPoint.y) / (2 * (1 - t) * t);
+        }
+
+        dragStartPos.x = e.clientX;
+        dragStartPos.y = e.clientY;
+        renderConnections();
+        saveToJSON();
+      }
+    } else if (potentialDraggedControl) {
+      const deltaX = Math.abs(e.clientX - dragStartPos.x);
+      const deltaY = Math.abs(e.clientY - dragStartPos.y);
+      
+      if (deltaX > 5 || deltaY > 5) {
+        hasMoved = true;
+        draggedControl = potentialDraggedControl;
+        potentialDraggedControl = null;
+        draggedControl.isDragging = true;
+        const canvasRect = canvas.getBoundingClientRect();
+        let newX = e.clientX - canvasRect.left;
+        let newY = e.clientY - canvasRect.top;
+
+        newX = Math.max(0, Math.min(newX, canvasRect.width));
+        newY = Math.max(0, Math.min(newY, canvasRect.height));
+
+        const fromNode = nodes.find(n => n.id === draggedControl.from);
+        const toNode = nodes.find(n => n.id === draggedControl.to);
+        if (fromNode && toNode) {
+          const fromRect = fromNode.element.getBoundingClientRect();
+          const toRect = toNode.element.getBoundingClientRect();
+          const x1 = fromRect.left + fromRect.width / 2 - canvasRect.left;
+          const y1 = fromRect.top + fromRect.height / 2 - canvasRect.top;
+          const x2 = toRect.left + toRect.width / 2 - canvasRect.left;
+          const y2 = toRect.top + toRect.height / 2 - canvasRect.top;
+          
+          let startPoint = getBorderPoint(x1, y1, x2, y2, fromRect, canvasRect) || {x: x1, y: y1};
+          let endPoint = getBorderPoint(x2, y2, x1, y1, toRect, canvasRect) || {x: x2, y: y2};
+
+          const t = 0.5;
+          draggedControl.controlX = (newX - (1 - t) ** 2 * startPoint.x - t ** 2 * endPoint.x) / (2 * (1 - t) * t);
+          draggedControl.controlY = (newY - (1 - t) ** 2 * startPoint.y - t ** 2 * endPoint.y) / (2 * (1 - t) * t);
+        }
+
+        dragStartPos.x = e.clientX;
+        dragStartPos.y = e.clientY;
+        renderConnections();
+      }
+    }
+  });
+
+  document.addEventListener('mouseup', () => {
+    if (draggedNode) {
+      if (hasMoved) {
+        saveToJSON();
+      }
+      draggedNode = null;
+      hasMoved = false;
+    }
+    if (draggedControl) {
+      if (draggedControl.isDragging) {
+        saveToJSON();
+      }
+      draggedControl.isDragging = false;
+      draggedControl = null;
+    }
+    potentialDraggedControl = null;
+  });
+
+  // Canvas-Events: Double-Click für neuen Node (Mouse) und Double-Tap (Touch)
+  canvas.addEventListener('dblclick', (e) => {
+    if (e.target === canvas || e.target === svg) {
+      const rect = canvas.getBoundingClientRect();
+      createNode(e.clientX - rect.left - 50, e.clientY - rect.top - 20);
+      saveToJSON();
+    }
+  });
+
+  // Touch für Canvas: Double-Tap zum Hinzufügen
+  let canvasLastTap = 0;
+  canvas.addEventListener('touchstart', (e) => {
+    if (e.target === canvas || e.target === svg) {
+      const currentTime = Date.now();
+      const tapLength = currentTime - canvasLastTap;
+      hasMoved = false;
+      dragStartPos.x = e.touches[0].clientX;
+      dragStartPos.y = e.touches[0].clientY;
+
+      if (tapLength < 500 && tapLength > 0) {
+        const touch = e.touches[0];
+        const rect = canvas.getBoundingClientRect();
+        createNode(touch.clientX - rect.left - 50, touch.clientY - rect.top - 20);
+        saveToJSON();
+      } else {
+        const touchMoveHandler = (e) => {
+          const touch = e.touches[0];
+          const deltaX = Math.abs(touch.clientX - dragStartPos.x);
+          const deltaY = Math.abs(touch.clientY - dragStartPos.y);
+
+          if (deltaX > 5 || deltaY > 5) {
+            hasMoved = true;
+          }
+        };
+
+        const touchEndHandler = (e) => {
+          document.removeEventListener('touchmove', touchMoveHandler);
+          document.removeEventListener('touchend', touchEndHandler);
+        };
+
+        document.addEventListener('touchmove', touchMoveHandler, { passive: true });
+        document.addEventListener('touchend', touchEndHandler, { passive: true });
+      }
+      canvasLastTap = currentTime;
+    }
+  }, { passive: true });
+
+  canvas.addEventListener('touchend', (e) => {
+    if (e.target === canvas || e.target === svg) {
+      if (!hasMoved) {
+        if (selectedNode) {
+          selectedNode.element.classList.remove('selected');
+          selectedNode.connectBtn.style.display = 'none';
+          selectedNode = null;
+        }
+        selectedConnection = null;
+        if (connectStart) {
+          connectStart.element.classList.remove('connecting');
+          canvas.classList.remove('connecting');
+          connectStart = null;
+        }
+        renderConnections();
+      }
+      hasMoved = false;
+    }
+  }, { passive: true });
+
+  document.querySelector('.conceptmap #addNode').addEventListener('click', () => {
+    const canvasRect = canvas.getBoundingClientRect();
+    const centerX = (canvasRect.width / 10) - 50;
+    const centerY = (canvasRect.height / 10) - 20;
+    createNode(centerX, centerY);
+    saveToJSON();
+  });
+document.querySelector('.conceptmap #deleteMode').addEventListener('click', () => {
+  // FIX: Reset Flag vor Löschung
+  isSelecting = false;
+  clearTimeout(selectTimeout);
+  if (selectedNode) {
+    deleteNode(selectedNode);
+    selectedNode = null;
+  } else if (selectedConnection) {
+    deleteConnection(selectedConnection);
+    selectedConnection = null;
+  } else {
+    alert('Bitte erst ein Element anklicken, dann Löschen drücken.');
+  }
+});
+  document.querySelector('.conceptmap #clearAll').addEventListener('click', () => {
+    if (confirm('Wirklich alles löschen?')) {
+      nodes.forEach(n => {
+        n.element.remove();
+        n.connectBtn.remove();
+      });
+      connections.forEach(c => {
+        if (c.labelElement) c.labelElement.remove();
+      });
+      nodes = [];
+      connections = [];
+      nodeIdCounter = 1;
+      connectionIdCounter = 1;
+      renderConnections();
+      saveToJSON();
+    }
+  });
+
+  document.querySelectorAll('.conceptmap .color-button').forEach(button => {
+    button.addEventListener('click', () => {
+      if (selectedNode) {
+        const color = button.getAttribute('data-color');
+        selectedNode.element.style.backgroundColor = color;
+        selectedNode.backgroundColor = color;
+        saveToJSON();
+      } else {
+        alert('Bitte erst ein Element auswählen.');
+      }
+    });
+  });
+
+  function saveToJSON() {
+    const data = {
+      nodes: nodes.map(n => ({
+        id: n.id,
+        x: n.x,
+        y: n.y,
+        text: n.element.querySelector('.node-text').textContent,
+        backgroundColor: n.backgroundColor
+      })),
+      connections: connections.map(c => ({
+        id: c.id,
+        from: c.from,
+        to: c.to,
+        label: c.label,
+        controlX: c.controlX,
+        controlY: c.controlY
+      }))
+    };
+    jsonInput.value = JSON.stringify(data);
+  }
+
+  function loadFromJSON(jsonStr) {
+    try {
+      const data = JSON.parse(jsonStr);
+      
+      nodes.forEach(n => {
+        n.element.remove();
+        n.connectBtn.remove();
+      });
+      connections.forEach(c => {
+        if (c.labelElement) c.labelElement.remove();
+      });
+      nodes = [];
+      connections = [];
+      
+      if (data.nodes) {
+        data.nodes.forEach(n => {
+          createNode(n.x, n.y, n.text, n.id, n.backgroundColor);
+          if (n.id >= nodeIdCounter) nodeIdCounter = n.id + 1;
+        });
+      }
+      
+      if (data.connections) {
+        data.connections.forEach(c => {
+          const from = nodes.find(n => n.id === c.from);
+          const to = nodes.find(n => n.id === c.to);
+          if (from && to) {
+            createConnection(from, to, c.label, c.controlX, c.controlY, c.id);
+            if (c.id >= connectionIdCounter) connectionIdCounter = c.id + 1;
+          }
+        });
+      }
+      
+      renderConnections();
+    } catch (e) {
+      alert('Fehler beim Laden: Ungültiges JSON-Format');
+    }
+  }
+
+   canvas.addEventListener('click', (e) => {
+    if (e.target === canvas || e.target === svg) {
+      // FIX: isSelecting-Timeout hier auch zurücksetzen
+      isSelecting = false;
+      clearTimeout(selectTimeout);
+
+      if (selectedNode) {
+        selectedNode.element.classList.remove('selected');
+        selectedNode.connectBtn.style.display = 'none';
+        selectedNode = null;
+      }
+      selectedConnection = null;
+      if (connectStart) {
+        connectStart.element.classList.remove('connecting');
+        canvas.classList.remove('connecting');
+        connectStart = null;
+      }
+      renderConnections();
+    }
+  });
+
+  function attachLabelEvents(element, conn) {
+    let labelLastTap = 0;
+
+    const editLabel = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'connection-label-input';
+      input.value = conn.label || '';
+      input.maxLength = 50;
+      input.style.left = element.style.left;
+      input.style.top = element.style.top;
+      canvas.appendChild(input);
+      conn.labelElement = input;
+      element.remove();
+
+      input.focus();
+      input.select();
+
+      input.addEventListener('input', (e) => {
+        if (input.value.length >= input.maxLength) {
+          alert(`Maximale Länge von ${input.maxLength} Zeichen erreicht!`);
+        }
+      });
+
+      const saveInput = () => {
+        conn.label = input.value.trim();
+        const newLabelDiv = document.createElement('div');
+        newLabelDiv.className = 'connection-label';
+        newLabelDiv.textContent = conn.label || '';
+        if (!conn.label) newLabelDiv.classList.add('empty');
+        newLabelDiv.style.left = input.style.left;
+        newLabelDiv.style.top = input.style.top;
+        canvas.appendChild(newLabelDiv);
+        conn.labelElement = newLabelDiv;
+        input.remove();
+        saveToJSON();
+        attachLabelEvents(newLabelDiv, conn);
+      };
+
+      input.addEventListener('blur', saveInput);
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          input.blur();
+        }
+      });
+    };
+
+    // Mouse-Events für Label (Desktop)
+    element.addEventListener('mousedown', (e) => {
+      e.stopPropagation();
+      if (draggedNode) {
+        draggedNode = null;
+      }
+      if (isSelecting) {
+        return;
+      }
+      potentialDraggedControl = conn;
+      hasMoved = false;
+      dragStartPos.x = e.clientX;
+      dragStartPos.y = e.clientY;
+    });
+
+    element.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!hasMoved && !isSelecting) {
+        selectConnection(conn);
+      }
+    });
+
+    element.addEventListener('dblclick', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      editLabel(e);
+    });
+
+    // Touch-Events für Label (iOS/Mobile)
+    element.addEventListener('touchstart', (e) => {
+      // FIX: Wichtig, um Safari's Touch-to-Mouse-Konvertierung zu verhindern
+      e.preventDefault(); 
+      if (draggedControl) {
+        draggedControl = null;
+      }
+      if (draggedNode) {
+        draggedNode = null;
+      }
+      const touch = e.touches[0];
+      const currentTime = Date.now();
+      const tapLength = currentTime - labelLastTap;
+      if (tapLength < 500 && tapLength > 0) {
+        editLabel(e);
+      } else {
+        if (isSelecting) {
+          return;
+        }
+        potentialDraggedControl = conn;
+        hasMoved = false;
+        dragStartPos.x = touch.clientX;
+        dragStartPos.y = touch.clientY;
+
+        const touchMoveHandler = createTouchDragHandler(false);
+        const touchEndHandler = (e) => {
+          if (!hasMoved) {
+            selectConnection(conn);
+          }
+          document.removeEventListener('touchmove', touchMoveHandler);
+          document.removeEventListener('touchend', touchEndHandler);
+        };
+
+        document.addEventListener('touchmove', touchMoveHandler, { passive: false });
+        document.addEventListener('touchend', touchEndHandler, { passive: true });
+
+        const globalTouchEnd = () => {
+          document.removeEventListener('touchmove', touchMoveHandler);
+          document.removeEventListener('touchend', touchEndHandler);
+          document.removeEventListener('touchend', globalTouchEnd);
+        };
+        document.addEventListener('touchend', globalTouchEnd, { once: true });
+      }
+      labelLastTap = currentTime;
+    }, { passive: false });
+  } 
+</script>

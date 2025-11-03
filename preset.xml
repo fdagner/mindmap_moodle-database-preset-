@@ -18,27 +18,14 @@
 
 <field>
 <type>text</type>
-<name>mermaid_text</name>
+<name>code</name>
 <required>0</required>
 </field>
 
 <field>
-<type>menu</type>
-<name>color_theme</name>
+<type>text</type>
+<name>thema</name>
 <required>0</required>
-<param1>Standard
-Hell
-Dunkel
-Winter
-Herbst
-Fr&#xFC;hling
-Sommer
-Kontrast
-Retro
-Pastell
-Monochrom
-Neon
-Rams</param1>
 </field>
 
 </preset>
