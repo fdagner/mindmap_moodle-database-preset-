@@ -44,56 +44,50 @@
         </div>
     </div>
 
-    <div id="combinedMindmapSection" class="mindmap">
-        <h2> <i class="fa-solid fa-sitemap" style="margin-left: 4px;"></i> Kombinierte Mindmap</h2>
-        <div class="combined-controls mindmap_buttons zoom-controls">
-            <button type="button" class="btn btn-light toggle-editor-btn hidden" onclick="toggleCombinedEditor()"
-                title="Listenmodus umschalten"><i class="fa-solid fa-list"></i></button>
-            <button type="button" class="btn btn-light hidden" onclick="zoomCombinedSvg(1.2)" title="Hineinzoomen">
-                <i class="fa-solid fa-magnifying-glass-plus"></i>
-            </button>
-            <button type="button" class="btn btn-light hidden" onclick="zoomCombinedSvg(1/1.2)" title="Herauszoomen">
-                <i class="fa-solid fa-magnifying-glass-minus"></i>
-            </button>
-            <button type="button" class="btn btn-light hidden" onclick="resetCombinedZoom()" title="Zoom zurücksetzen">
-                <i class="fa-solid fa-arrows-to-circle"></i>
-            </button>
-             <button type="button" class="btn btn-light toggle-fullscreen-btn hidden" onclick="togglePresentationMode()" title="Präsentationsmodus"><i
-                        class="fa-solid fa-person-chalkboard"></i></button>
-            <div class="dropdown">
-                <button class="btn btn-light dropdown-toggle hidden" type="button" data-bs-toggle="dropdown"
-                    aria-expanded="false" title="Mindmap exportieren">
-                    <i class="fa-solid fa-file-export"></i>
-                </button>
-                <ul class="dropdown-menu">
-                    <li><a class="dropdown-item" href="#" onclick="exportCombinedAsSVG()">SVG</a></li>
-                    <li><a class="dropdown-item" href="#" onclick="exportCombinedAsHTML()">Interaktives HTML</a></li>
-                    <li><a class="dropdown-item" href="#" onclick="copyCombinedMermaidCode()">Mermaid</a></li>
-                </ul>
+<!-- Detail-Modal für Beobachtungen in der Listenansicht -->
+<div class="modal fade" id="observationDetailModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p><span id="detailGroupName"></span></p>
+                <div class="mb-3">
+                    <input type="text" id="detailTime" class="form-control" readonly>
+                </div>
+                <div class="mb-3">
+                    <div class="d-flex align-items-center">
+                        <input type="range" class="form-range me-3" min="0" max="100" step="10" id="detailSlider" hidden>
+                        <span id="detailValue" style="font-weight:bold; min-width:50px; text-align:center;"></span> %
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <textarea id="detailText" class="form-control" rows="5" readonly></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Schließen</button>
             </div>
         </div>
-
-        <div class="editor-panel" style="display: none;">
-
-            <div id="combinedMindmapEditor" class="mindmap-tree"></div>
-            <div class="export-area" style="display: none;">
-                <strong>Mermaid Code:</strong>
-                <textarea id="combinedMermaidText" class="form-control"></textarea>
-            </div>
-        </div>
-
-        <div class="preview-panel" id="combinedPreviewPanel">
-            <div id="combinedSvgContainer" class="svg-container svg-container-list">
-                <div id="combinedWelcomeMessage" class="loading"> <button type="button" class="btn btn-secondary"
-                        onclick="showCombinedControls()" title="Kombinierte Mindmap erstellen">
-                        Kombinierte Mindmap erzeugen
-                    </button></div>
-                <div id="svgZoomContainer"></div>
-            </div>
-        </div>
-
-
     </div>
 </div>
-<div id="mindmaps">
-    <h2><i class="fa-solid fa-list" style="margin-left: 4px;"></i> Einzelne Mindmaps</h2>
+    <div class="mt-5">
+        <div class="table-responsive">
+
+      <table class="table table-bordered table-striped" id="observationTable">
+              <thead class="table-dark">
+
+                    <tr>
+                        <th><i class="fa-regular fa-user"></i></th>
+                        <th><i class="fa-solid fa-brush"></i></th>
+                        <th><i class="fa-solid fa-hashtag"></i></th>
+                         <th><i class="fa-regular fa-comment"></i></th>
+                        <th></th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody id="entryTableBody">
+
+       

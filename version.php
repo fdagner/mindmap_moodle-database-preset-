@@ -16,7 +16,7 @@
 
 /**
  * @package    datapreset
- * @subpackage mindmap
+ * @subpackage lessonstudy
  * @copyright  Florian Dagner <florian.dagner@outlook.de>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */

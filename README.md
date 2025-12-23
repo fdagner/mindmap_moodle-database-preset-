@@ -1,14 +1,14 @@
-#  Mind Map
+#  lesson study
 
-Mind Map is a preset for the Moodle activity database.
+lesson study is a preset for the Moodle activity database.
 
 ## Description
 
-Users can create a mind map.
+Users can record and compare student observations for a lesson study.
 
 ## Getting started
 
-Download the [release file](https://github.com/fdagner/mindmap_moodle-database-preset-/releases). 
+Download the [release file](https://github.com/fdagner/lessonstudy_moodle-database-preset-/releases). 
 Create a "Database" activity in Moodle and then upload the ZIP file.
 
 ## Language Support

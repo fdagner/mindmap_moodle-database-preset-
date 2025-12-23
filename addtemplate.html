@@ -77,1333 +77,466 @@
             </div>
         </div>
     </div>
-
-    <div id="deleteModal" class="mindmap-modal">
-        <div class="mindmap-modal-content">
-            <h3>Knoten löschen</h3>
-            <p id="deleteModalMessage"></p>
-            <div class="mindmap-modal-buttons" id="deleteModalButtons"></div>
+    </div>
+    <div class="mt-5">
+        <div class="table-responsive">
+            <table class="table table-bordered table-striped" id="observationTable">
+              <thead class="table-dark">
+                    <tr>
+                        <th><i class="fa-regular fa-clock"></i></th>
+                        <th><i class="fa-regular fa-percent"></i></th>
+                        <th><i class="fa-regular fa-comment"></i></th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
         </div>
+        <div id="noData" class="text-muted">Noch keine Beobachtungen vorhanden.</div>
     </div>
 
-    <div id="errorModal" class="mindmap-modal">
-        <div class="mindmap-modal-content">
-            <h3>Fehler</h3>
-            <p id="errorModalMessage"></p>
-            <div class="mindmap-modal-buttons">
-                <button type="button" class="btn btn-primary" onclick="closeErrorModal()">OK</button>
-            </div>
-        </div>
+    <div class="mt-4" hidden>
+        <h5>Gespeicherte Beobachtungen (JSON):</h5>
+        [[json]]
     </div>
-
-    <div id="successModal" class="mindmap-modal">
-        <div class="mindmap-modal-content">
-            <h3>Erfolg</h3>
-            <p id="successModalMessage"></p>
-            <div class="mindmap-modal-buttons">
-                <button type="button" class="btn btn-primary" onclick="closeSuccessModal()">OK</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="warningModal" class="mindmap-modal">
-        <div class="mindmap-modal-content">
-            <h3>Warnung</h3>
-            <p id="warningModalMessage"></p>
-            <div class="mindmap-modal-buttons">
-                <button type="button" class="btn btn-primary" onclick="closeWarningModal()">OK</button>
-            </div>
-        </div>
-    </div>
-
-    <script>
- 
-   let BRANCH_COLORS = BRANCH_COLORS_SCHEMES['Standard'].colors;
-        const editor = document.getElementById('mindmapEditor');
-        const previewContainer = document.getElementById('svgZoomContainer');
-        const mermaidInput = document.getElementById('[[mermaid_text#id]]');
-        const welcomeMessage = document.getElementById('welcomeMessage');
-
-        // Function for setting the color scheme
-        function setColorScheme() {
-            const colorThemeSelect = document.getElementById('[[color_theme#id]]');
-            if (!colorThemeSelect) return;
-
-            let selectedScheme = colorThemeSelect.options[colorThemeSelect.selectedIndex].value;
-            if (!selectedScheme) selectedScheme = 'Standard';
-
-            if (BRANCH_COLORS_SCHEMES[selectedScheme]) {
-                BRANCH_COLORS = [...BRANCH_COLORS_SCHEMES[selectedScheme].colors];
-            } else {
-                BRANCH_COLORS = [...BRANCH_COLORS_SCHEMES['Standard'].colors];
-            }
-
-            renderEditor();
-            renderMindmap();
-        }
-
-        // Function to show/hide the editor
-        const toggleEditor = () => {
-            const editorPanel = document.querySelector('.editor-panel');
-            const previewPanel = document.querySelector('.preview-panel');
-            const toggleButton = document.querySelector('.toggle-editor-btn');
-            const zoomButtons = document.querySelectorAll('.zoom-controls .btn.btn-light:not(.toggle-editor-btn)');
-
-            if (editorPanel.style.display === 'none') {
-                editorPanel.style.display = 'block';
-                previewPanel.style.display = 'none';
-                toggleButton.innerHTML = '<i class="fa-solid fa-lightbulb"></i>';
-                zoomButtons.forEach(button => button.style.display = 'none');
-                if (welcomeMessage) welcomeMessage.style.display = 'none';
-            } else {
-                editorPanel.style.display = 'none';
-                previewPanel.style.display = 'block';
-                toggleButton.innerHTML = '<i class="fa-solid fa-list"></i>';
-                zoomButtons.forEach(button => button.style.display = 'inline-block');
-                if (welcomeMessage && !hasInteractedWithRoot && !mindmapData.some(node => node.parent !== null)) {
-                    welcomeMessage.style.display = 'block';
-                }
-            }
-        };
-
-        // Initialization
-        document.addEventListener('DOMContentLoaded', () => {
-            if (!editor || !previewContainer || !mermaidInput || !welcomeMessage) {
-                console.error('Required DOM elements are missing:', {
-                    mindmapEditor: !!editor,
-                    svgZoomContainer: !!previewContainer,
-                    mermaidInput: !!mermaidInput,
-                    welcomeMessage: !!welcomeMessage
-                });
-                showErrorModal('Interner Fehler: Erforderliche DOM-Elemente fehlen. Bitte überprüfen Sie die HTML-Struktur.');
-                mindmapData = [];
-                const defaultRootNode = {
-                    id: nodeCounter++,
-                    text: 'Hauptknoten',
-                    level: 0,
-                    parent: null,
-                    order: 0,
-                    branchIndex: 0
-                };
-                mindmapData.push(defaultRootNode);
-                renderEditor();
-                if (welcomeMessage) welcomeMessage.style.display = 'block';
-                return;
-            }
-            initializeFromMermaidCode();
-            setColorScheme();
-            renderMindmap();
-            const colorThemeSelect = document.getElementById('[[color_theme#id]]');
-            if (colorThemeSelect) {
-                colorThemeSelect.addEventListener('change', setColorScheme);
-            }
-        });
-
-        // Zoom
-        const zoomSvg = (factor) => {
-            if (!previewContainer) return;
-            currentZoom *= factor;
-            previewContainer.style.transformOrigin = '0 0';
-            previewContainer.style.transform = `scale(${currentZoom})`;
-            document.getElementById('mermaidPreview').style.overflow = 'auto';
-        };
-
-        const resetZoom = () => {
-            if (!previewContainer) return;
-            currentZoom = 1;
-            previewContainer.style.transform = 'none';
-            document.getElementById('mermaidPreview').style.overflow = 'auto';
-        };
-
-        // Node validation
-        const validateNodeText = (text, inputElement) => {
-            if (!text.trim()) {
-                showErrorModal('Die Eingabe darf nicht leer sein.');
-                inputElement?.focus();
-                return false;
-            }
-            if (text.length > MAX_TEXT_LENGTH) {
-                showErrorModal(`Die Eingabe darf maximal ${MAX_TEXT_LENGTH} Zeichen lang sein.`);
-                inputElement?.focus();
-                return false;
-            }
-            if (/<[a-zA-Z0-9\s="/]*(>|\/>|on[a-zA-Z]+=["'])|[|~<>]/i.test(text)) {
-                showErrorModal('Die Eingabe darf keinen HTML-Code, Skripte, "|", "~", "<" oder ">" enthalten.');
-                inputElement?.focus();
-                return false;
-            }
-            return true;
-        };
-
-        // Real-time input validation for SVG overlay
-        const validateInputLength = (inputElement, nodeId) => {
-            let text = inputElement.value;
-            if (text.length > MAX_TEXT_LENGTH) {
-                showErrorModal(`Die Eingabe darf maximal ${MAX_TEXT_LENGTH} Zeichen lang sein.`);
-                inputElement.value = text.slice(0, MAX_TEXT_LENGTH);
-                inputElement.focus();
-            }
-            if (/<[a-zA-Z0-9\s="/]*(>|\/>|on[a-zA-Z]+=["'])|[|~<>]/i.test(text)) {
-                showErrorModal('Die Eingabe darf keinen HTML-Code, Skripte, "|", "~", "<" oder ">" enthalten.');
-                inputElement.value = text.replace(/[<|~>]/g, '');
-                inputElement.focus();
-            }
-        };
-
-        // Initializes mind map data from Mermaid code
-        function initializeFromMermaidCode() {
-            if (!mermaidInput) {
-                console.error('Element with ID "[[mermaid_text#id]]" not found in the DOM.');
-                showErrorModal('Interner Fehler: Das Eingabefeld für den Mermaid-Code wurde nicht gefunden.');
-                mindmapData = [];
-                const defaultRootNode = {
-                    id: nodeCounter++,
-                    text: 'Hauptknoten',
-                    level: 0,
-                    parent: null,
-                    order: 0,
-                    branchIndex: 0
-                };
-                mindmapData.push(defaultRootNode);
-                renderEditor();
-                if (welcomeMessage) welcomeMessage.style.display = 'block';
-                return;
-            }
-
-            const codeInput = mermaidInput.value;
-            const lines = codeInput.split('|').map(line => line.trimEnd()).filter(line => line.trim().length > 0);
-
-            mindmapData = [];
-            let levelMap = {};
-            let branchIndexCounter = 0;
-
-            if (!codeInput.trim() || lines.length === 0 || (lines.length === 1 && lines[0].trim() === 'mindmap')) {
-                const defaultRootNode = {
-                    id: nodeCounter++,
-                    text: 'Hauptknoten',
-                    level: 0,
-                    parent: null,
-                    order: 0,
-                    branchIndex: 0
-                };
-                mindmapData.push(defaultRootNode);
-                mermaidInput.value = 'mindmap|root(Hauptknoten)';
-                renderEditor();
-                if (welcomeMessage) welcomeMessage.style.display = 'block';
-                return;
-            }
-
-            if (!lines[0] || lines[0].trim() !== 'mindmap') {
-                lines.unshift('mindmap');
-            }
-
-            lines.forEach((line, index) => {
-                if (line.trim() === 'mindmap') return;
-
-                const match = line.match(/^(~*)[^~]*/);
-                if (!match) return;
-                const level = match[1] ? match[1].length : 0;
-                const textWithIndent = match[0];
-
-                if (level > MAX_LEVEL) return;
-
-                let parentId = null;
-                if (level > 0) {
-                    for (let i = level - 1; i >= 0; i--) {
-                        if (levelMap[i] !== undefined) {
-                            parentId = levelMap[i];
-                            break;
-                        }
-                    }
-                }
-
-                if (parentId !== null) {
-                    const childrenCount = mindmapData.filter(node => node.parent === parentId).length;
-                    if (childrenCount >= MAX_CHILDREN_PER_NODE) return;
-                }
-
-                let text = textWithIndent.replace(/^~*/, '').trim();
-                if (text.startsWith('root(') && text.endsWith(')')) {
-                    text = text.slice(5, -1);
-                }
-
-                if (!validateNodeText(text)) return;
-
-                const siblings = mindmapData.filter(n => n.parent === parentId);
-                const order = siblings.length;
-
-                const branchIndex = level === 0 ? 0 :
-                    level === 1 ? branchIndexCounter++ :
-                        mindmapData.find(n => n.id === parentId)?.branchIndex || 0;
-
-                const newNode = {
-                    id: nodeCounter++,
-                    text: text,
-                    level: level,
-                    parent: parentId,
-                    order: order,
-                    branchIndex: branchIndex
-                };
-
-                mindmapData.push(newNode);
-                levelMap[level] = newNode.id;
-
-                Object.keys(levelMap).forEach(key => {
-                    if (parseInt(key) > level) {
-                        delete levelMap[key];
-                    }
-                });
-            });
-
-            if (mindmapData.length === 0) {
-                const defaultRootNode = {
-                    id: nodeCounter++,
-                    text: 'Hauptknoten',
-                    level: 0,
-                    parent: null,
-                    order: 0,
-                    branchIndex: 0
-                };
-                mindmapData.push(defaultRootNode);
-                mermaidInput.value = 'mindmap|root(Hauptknoten)';
-                if (welcomeMessage) welcomeMessage.style.display = 'block';
-            } else if (welcomeMessage && !mindmapData.some(node => node.parent !== null)) {
-                welcomeMessage.style.display = 'block';
-            } else if (welcomeMessage) {
-                welcomeMessage.style.display = 'none';
-            }
-
-            renderEditor();
-        }
-
-        // Collapse/expand function for Level 1 nodes
-        const toggleCollapse = (nodeId) => {
-            const node = mindmapData.find(n => n.id === nodeId);
-            if (!node || node.level !== 1) return;
-            node.isCollapsed = !node.isCollapsed;
-            renderEditor();
-        };
-
-        // Checks whether a node is visible based on the isCollapsed state of its ancestors
-        const isNodeVisible = (node) => {
-            if (node.level === 0) return true;
-            const parent = mindmapData.find(n => n.id === node.parent);
-            if (!parent) return false;
-            if (parent.level === 1 && parent.isCollapsed) return false;
-            return isNodeVisible(parent);
-        };
-
-        // Node and editor rendering
-        const getSortedNodes = () => {
-            const nodes = [];
-            const rootNodes = mindmapData.filter(node => node.level === 0).sort((a, b) => a.order - b.order);
-            const addNodeAndChildren = node => {
-                if (!isNodeVisible(node)) return;
-                nodes.push(node);
-                if (node.level === 1 && node.isCollapsed) return;
-                mindmapData.filter(child => child.parent === node.id)
-                    .sort((a, b) => (a.order || 0) - (b.order || 0))
-                    .forEach(addNodeAndChildren);
-            };
-            rootNodes.forEach(addNodeAndChildren);
-            return nodes;
-        };
-
-        const renderEditor = () => {
-            if (!editor) return;
-            editor.innerHTML = '';
-            const sortedNodes = getSortedNodes();
-
-            sortedNodes.forEach((node, index) => {
-                const nodeDiv = document.createElement('div');
-                nodeDiv.className = 'node';
-                nodeDiv.dataset.nodeId = node.id;
-                nodeDiv.dataset.index = index;
-                nodeDiv.dataset.level = node.level;
-                nodeDiv.draggable = true;
-
-                const parent = node.level > 0 ? mindmapData.find(n => n.id === node.parent) : null;
-                node.branchIndex = node.level === 0 ? 0 :
-                    node.level === 1 ? mindmapData.filter(n => n.parent === node.parent).sort((a, b) => (a.order || 0) - (b.order || 0)).indexOf(node) :
-                        parent ? parent.branchIndex : 0;
-
-                const collapseIcon = node.level === 1 ? `<span class="collapse-icon" onclick="toggleCollapse(${node.id})" title="${node.isCollapsed ? 'Ast ausklappen' : 'Ast einklappen'}">${node.isCollapsed ? '<i class="fa-solid fa-chevron-right"></i>' : '<i class="fa-solid fa-chevron-down"></i>'}</span>` : '';
-                const addButton = node.level < MAX_LEVEL ? `
-                    <button type="button" class="add-btn drop-zone-child" 
-                            onclick="addChildNode(${node.id})" 
-                            title="Unterknoten hinzufügen"
-                            data-node-id="${node.id}"><i class="fa-solid fa-plus"></i></button>
-                ` : '';
-                const indent = node.level > 1 ? `<span class="indent">${'　'.repeat(node.level * 2)}</span>` : '';
-
-                const colorThemeSelect = document.getElementById('[[color_theme#id]]');
-                let selectedScheme = colorThemeSelect?.options[colorThemeSelect.selectedIndex]?.value || 'Standard';
-                const inputBackgroundColor = node.level === 0 ? BRANCH_COLORS_SCHEMES[selectedScheme].level0 :
-                    node.level === 1 ? BRANCH_COLORS[node.branchIndex % BRANCH_COLORS.length] :
-                        node.level === 2 ? BRANCH_COLORS[node.branchIndex % BRANCH_COLORS.length] :
-                            '#ffffff';
-                const textColor = getContrastTextColor(inputBackgroundColor);
-
-                nodeDiv.innerHTML = `
-                    ${indent}
-                    ${collapseIcon}
-                    ${addButton}
-                    <input type="text" class="node-input" value="${node.text}" 
-                           style="background-color: ${inputBackgroundColor}; color: ${textColor};"
-                           oninput="validateInputLength(this, ${node.id})"
-                           onchange="updateNodeText(${node.id}, this.value, this)"
-                           placeholder="Knotenbeschriftung eingeben" 
-                           draggable="false" 
-                           data-node-id="${node.id}">
-                    <button type="button" class="delete-btn" 
-                            onclick="showDeleteModal(${node.id})" 
-                            title="${node.level > 0 ? 'Knoten löschen' : 'Hauptknoten löschen'}" 
-                            data-node-id="${node.id}"><i class="fa-solid fa-trash"></i></button>
-                `;
-
-                nodeDiv.addEventListener('dragstart', handleDragStart);
-                nodeDiv.addEventListener('touchstart', handleDragStart, { passive: false });
-                nodeDiv.addEventListener('dragover', handleDragOver);
-                nodeDiv.addEventListener('drop', handleDrop);
-                nodeDiv.addEventListener('dragend', handleDragEnd);
-                nodeDiv.addEventListener('dragenter', e => e.preventDefault());
-                nodeDiv.addEventListener('dragleave', e => {
-                    const node = e.target.closest('.node');
-                    if (node && !node.contains(e.relatedTarget)) {
-                        node.classList.remove('drag-over-child', 'drag-over-sibling', 'drag-over-sibling-top');
-                    }
-                });
-                nodeDiv.addEventListener('touchmove', handleTouchMove, { passive: false });
-                nodeDiv.addEventListener('touchend', handleTouchEnd, { passive: false });
-
-                const inputElement = nodeDiv.querySelector('.node-input');
-                const addBtn = nodeDiv.querySelector('.add-btn');
-                const deleteBtn = nodeDiv.querySelector('.delete-btn');
-                const collapseIconElement = nodeDiv.querySelector('.collapse-icon');
-
-                [inputElement, addBtn, deleteBtn, collapseIconElement].forEach(el => {
-                    if (el) {
-                        el.addEventListener('dragstart', e => e.stopPropagation());
-                        el.addEventListener('touchstart', e => e.stopPropagation(), { passive: false });
-                    }
-                });
-
-                if (addBtn) {
-                    addBtn.addEventListener('dragover', handleDropZoneDragOver);
-                    addBtn.addEventListener('drop', e => handleDropZoneDrop(e, node.id, 'child'));
-                }
-
-                let isDragging = false;
-
-                inputElement.addEventListener('mousedown', e => {
-                    e.stopPropagation();
-                    isDragging = false;
-                    const input = e.target;
-                    const rect = input.getBoundingClientRect();
-                    const clickX = e.clientX - rect.left;
-                    const ctx = document.createElement('canvas').getContext('2d');
-                    ctx.font = window.getComputedStyle(input).fontSize + ' ' + window.getComputedStyle(input).fontFamily;
-                    const text = input.value;
-                    let bestPosition = 0;
-                    for (let i = 0; i <= text.length; i++) {
-                        if (ctx.measureText(text.substring(0, i)).width + 10 >= clickX) {
-                            bestPosition = i;
-                            break;
-                        }
-                        bestPosition = i;
-                    }
-                    setTimeout(() => !isDragging && input.setSelectionRange(bestPosition, bestPosition), 0);
-                });
-
-                inputElement.addEventListener('click', e => {
-                    e.stopPropagation();
-                    if (isDragging) return e.preventDefault();
-                    const input = e.target;
-                    setTimeout(() => {
-                        const rect = input.getBoundingClientRect();
-                        if ((e.clientX - rect.left) > (rect.width - 20) * 0.9) {
-                            input.setSelectionRange(input.value.length, input.value.length);
-                        }
-                    }, 10);
-                });
-
-                inputElement.addEventListener('keydown', e => (e.key === 'Enter' || e.keyCode === 13) && e.preventDefault() && e.target.blur());
-
-                editor.appendChild(nodeDiv);
-            });
-        };
-
-        // Node management
-        const addChildNode = (parentId, isSvgMode = false) => {
-            const parent = mindmapData.find(node => node.id === parentId);
-            if (!parent) return;
-            if (parent.level >= MAX_LEVEL) return showErrorModal(`Die maximale Tiefe von ${MAX_LEVEL} Ebenen wurde erreicht.`);
-            if (mindmapData.filter(node => node.parent === parentId).length >= MAX_CHILDREN_PER_NODE) {
-                return showErrorModal(`Der Elternknoten hat bereits die maximale Anzahl von ${MAX_CHILDREN_PER_NODE} Unterknoten erreicht.`);
-            }
-            const siblings = mindmapData.filter(node => node.parent === parentId);
-            const newNode = {
-                id: nodeCounter++,
-                text: 'Neuer Knoten',
-                level: parent.level + 1,
-                parent: parentId,
-                order: siblings.length > 0 ? Math.max(...siblings.map(s => s.order || 0)) + 1 : 0,
-                branchIndex: parent.level === 0 ? siblings.length : parent.branchIndex,
-                isCollapsed: parent.level === 1 ? false : undefined
-            };
-            mindmapData.push(newNode);
-            if (parent.level === 1) parent.isCollapsed = false;
-            renderEditor();
-            renderMindmap();
-            if (welcomeMessage && parent.level === 0) welcomeMessage.style.display = 'none';
-            if (isSvgMode) {
-                setTimeout(() => {
-                    const svgContainer = document.querySelector('#svgZoomContainer svg');
-                    if (svgContainer) {
-                        const targetRect = svgContainer.querySelector(`rect[data-node-id="${newNode.id}"]`);
-                        if (targetRect) {
-                            const rect = targetRect.getBoundingClientRect();
-                            const zoomFactor = currentZoom || 1;
-                            const inputOverlay = document.createElement('div');
-                            inputOverlay.className = 'input-overlay';
-                            const overlayWidth = (rect.width / zoomFactor) * 1;
-                            inputOverlay.style.left = `${rect.left + window.scrollX - (overlayWidth - rect.width / zoomFactor) / 2}px`;
-                            inputOverlay.style.top = `${rect.top + window.scrollY}px`;
-                            inputOverlay.style.width = `${overlayWidth}px`;
-                            inputOverlay.style.height = `${rect.height / zoomFactor}px`;
-                            const input = document.createElement('input');
-                            input.type = 'text';
-                            input.value = newNode.text;
-                            const colorThemeSelect = document.getElementById('[[color_theme#id]]');
-                            let selectedScheme = colorThemeSelect?.options[colorThemeSelect.selectedIndex]?.value || 'Standard';
-                            const inputBackgroundColor = newNode.level === 0 ? BRANCH_COLORS_SCHEMES[selectedScheme].level0 :
-                                newNode.level === 1 ? BRANCH_COLORS[newNode.branchIndex % BRANCH_COLORS.length] :
-                                    newNode.level === 2 ? BRANCH_COLORS[newNode.branchIndex % BRANCH_COLORS.length] :
-                                        '#ffffff';
-                            input.style.backgroundColor = inputBackgroundColor;
-                            input.style.color = getContrastTextColor(inputBackgroundColor);
-                            inputOverlay.appendChild(input);
-                            document.body.appendChild(inputOverlay);
-                            input.focus();
-                            input.select();
-
-                            let isSaving = false;
-
-                            input.addEventListener('input', () => {
-                                validateInputLength(input, newNode.id);
-                            });
-
-                            const saveInput = () => {
-                                if (isSaving) return;
-                                isSaving = true;
-                                if (validateNodeText(input.value, input)) {
-                                    updateNodeText(newNode.id, input.value, input);
-                                    renderEditor();
-                                }
-                                if (inputOverlay.isConnected) {
-                                    inputOverlay.remove();
-                                }
-                                document.removeEventListener('click', closeInputOverlay);
-                                isSaving = false;
-                            };
-
-                            input.addEventListener('blur', saveInput);
-                            input.addEventListener('keydown', (e) => {
-                                if (e.key === 'Enter' || e.keyCode === 13) {
-                                    e.preventDefault();
-                                    saveInput();
-                                }
-                            });
-
-                            const closeInputOverlay = (e) => {
-                                if (!inputOverlay.contains(e.target)) {
-                                    saveInput();
-                                }
-                            };
-                            document.addEventListener('click', closeInputOverlay);
-                        }
-                    }
-                }, 100);
-            } else {
-                setTimeout(() => document.querySelector(`input[onchange*="${newNode.id}"]`)?.focus()?.select(), 100);
-            }
-        };
-
-        const showDeleteModal = nodeId => {
-            nodeToDelete = parseInt(nodeId);
-            const node = mindmapData.find(n => n.id === nodeToDelete);
-            if (!node) {
-                nodeToDelete = null;
-                return showErrorModal('Der ausgewählte Knoten wurde nicht gefunden.');
-            }
-            const hasChildren = mindmapData.some(n => n.parent === nodeToDelete);
-            const buttons = node.level === 0 ? `
-                <button type="button" class="btn btn-secondary" onclick="closeDeleteModal()">Abbrechen</button>
-                <button type="button" class="btn btn-danger" onclick="confirmDelete(true, ${node.id})">Gesamte Mindmap löschen</button>
-            ` : hasChildren ? `
-                <button type="button" class="btn btn-secondary" onclick="closeDeleteModal()">Abbrechen</button>
-                <button type="button" class="btn btn-danger" onclick="confirmDelete(false, ${node.id})">Nur diesen Knoten</button>
-                <button type="button" class="btn btn-danger" onclick="confirmDelete(true, ${node.id})">Gesamten Ast</button>
-            ` : `
-                <button type="button" class="btn btn-secondary" onclick="closeDeleteModal()">Abbrechen</button>
-                <button type="button" class="btn btn-danger" onclick="confirmDelete(false, ${node.id})">Knoten löschen</button>
-            `;
-            showModal('deleteModal', node.level === 0 ? 'Achtung, der Hauptknoten löscht die gesamte Mindmap.' :
-                hasChildren ? 'Möchtest du nur diesen Knoten oder den gesamten Ast (inklusive Unterknoten) löschen?' :
-                    'Möchtest du diesen Knoten löschen?', buttons);
-        };
-
-        const closeDeleteModal = () => closeModal('deleteModal');
-
-        const confirmDelete = (deleteBranch, nodeId) => {
-            const id = parseInt(nodeId);
-            const node = mindmapData.find(n => n.id === id);
-            if (!node) {
-                closeDeleteModal();
-                return showErrorModal('Der ausgewählte Knoten wurde nicht gefunden.');
-            }
-            if (node.level === 0) {
-                mindmapData = [];
-                nodeCounter = 0;
-                const newRootNode = { id: nodeCounter++, text: 'Hauptknoten', level: 0, parent: null, order: 0, branchIndex: 0, isCollapsed: false };
-                mindmapData.push(newRootNode);
-                if (mermaidInput) mermaidInput.value = 'mindmap|root(Hauptknoten)';
-                if (welcomeMessage) welcomeMessage.style.display = 'block';
-            } else if (deleteBranch) {
-                deleteNodeAndChildren(id);
-                normalizeOrders();
-            } else {
-                const children = mindmapData.filter(n => n.parent === id);
-                const parentId = node.parent;
-                const parentChildrenCount = mindmapData.filter(n => n.parent === parentId && n.id !== id).length;
-                if (children.length + parentChildrenCount > MAX_CHILDREN_PER_NODE) {
-                    showErrorModal(`Der Elternknoten würde die maximale Anzahl von ${MAX_CHILDREN_PER_NODE} Unterknoten überschreiten.`);
-                    return closeDeleteModal();
-                }
-                children.forEach(child => {
-                    if (child.level > MAX_LEVEL) {
-                        showErrorModal(`Das Verschieben der Unterknoten würde die maximale Tiefe von ${MAX_LEVEL} Ebenen überschreiten.`);
-                        return closeDeleteModal();
-                    }
-                    child.parent = parentId;
-                    child.level = node.level;
-                    child.branchIndex = node.branchIndex;
-                });
-                mindmapData = mindmapData.filter(n => n.id !== id);
-                normalizeOrders();
-            }
-            renderEditor();
-            renderMindmap();
-            closeDeleteModal();
-        };
-
-        const deleteNodeAndChildren = id => {
-            mindmapData.filter(node => node.parent === id).forEach(child => deleteNodeAndChildren(child.id));
-            mindmapData = mindmapData.filter(node => node.id !== id);
-            if (welcomeMessage && !mindmapData.some(node => node.parent !== null)) {
-                welcomeMessage.style.display = 'block';
-            }
-        };
-
-        const updateNodeText = (nodeId, newText, inputElement) => {
-            const node = mindmapData.find(n => n.id === nodeId);
-            if (!node || !validateNodeText(newText, inputElement)) {
-                inputElement.value = node.text;
-                return;
-            }
-            node.text = newText.trim();
-            renderMindmap();
-        };
-
-        // Drag-and-drop and touch handling
-        const getTargetElement = (x, y) => {
-            let target = document.elementFromPoint(x, y);
-            if (!target) {
-                const nodes = document.querySelectorAll('.node');
-                target = Array.from(nodes).find(node => {
-                    const rect = node.getBoundingClientRect();
-                    return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
-                });
-            }
-            return target;
-        };
-
-        const handleDragStart = e => {
-            if (e.type === 'touchstart' && e.touches.length > 1) return;
-            if (e.type === 'touchstart') e.preventDefault();
-            const node = e.target.closest('.node');
-            draggedNode = parseInt(node.dataset.nodeId);
-            node.classList.add('dragging');
-            document.querySelectorAll('.add-btn').forEach(btn => btn.style.boxShadow = '0 0 5px rgba(0, 0, 0, 0.3)');
-            if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
-        };
-
-        const handleDragOver = e => {
-            e.preventDefault();
-            e.dataTransfer.dropEffect = 'move';
-            const targetNode = e.target.closest('.node');
-            if (!targetNode || parseInt(targetNode.dataset.nodeId) === draggedNode) return;
-
-            document.querySelectorAll('.node').forEach(n => n.classList.remove('drag-over-child', 'drag-over-sibling', 'drag-over-sibling-top'));
-
-            const rect = targetNode.getBoundingClientRect();
-            const offsetY = e.clientY - rect.top;
-            const nodeToMove = mindmapData.find(n => n.id === draggedNode);
-            const targetNodeData = mindmapData.find(n => n.id === parseInt(targetNode.dataset.nodeId));
-
-            if (nodeToMove && targetNodeData && nodeToMove.parent === targetNodeData.parent && nodeToMove.level > 0) {
-                // Same parent, consider reordering
-                const threshold = rect.height / 3;
-                if (offsetY < threshold) {
-                    targetNode.classList.add('drag-over-sibling-top');
-                } else if (offsetY > rect.height - threshold) {
-                    targetNode.classList.add('drag-over-sibling');
-                } else {
-                    targetNode.classList.add('drag-over-child');
-                }
-            } else {
-                targetNode.classList.add('drag-over-child');
-            }
-        };
-
-        const handleDropZoneDragOver = e => {
-            e.preventDefault();
-            e.stopPropagation();
-            e.dataTransfer.dropEffect = 'move';
-            e.target.classList.add('drop-target');
-        };
-
-        const handleDropZoneDrop = (e, targetNodeId, dropType) => {
-            e.preventDefault();
-            e.stopPropagation();
-            if (draggedNode !== targetNodeId) moveNodeAdvanced(draggedNode, targetNodeId, dropType);
-            document.querySelectorAll('.drop-target').forEach(el => el.classList.remove('drop-target'));
-        };
-
-        const handleDrop = e => {
-            e.preventDefault();
-            const targetNode = e.target.closest('.node');
-            if (!targetNode) return;
-            const targetNodeId = parseInt(targetNode.dataset.nodeId);
-            if (draggedNode === targetNodeId) return;
-
-            const rect = targetNode.getBoundingClientRect();
-            const offsetY = e.clientY - rect.top;
-            const nodeToMove = mindmapData.find(n => n.id === draggedNode);
-            const targetNodeData = mindmapData.find(n => n.id === targetNodeId);
-
-            let dropType = 'child';
-            if (nodeToMove.parent === targetNodeData.parent && nodeToMove.level > 0) {
-                const threshold = rect.height / 3;
-                if (offsetY < threshold) {
-                    dropType = 'before';
-                } else if (offsetY > rect.height - threshold) {
-                    dropType = 'after';
-                }
-            }
-
-            moveNodeAdvanced(draggedNode, targetNodeId, dropType);
-            document.querySelectorAll('.node').forEach(node => node.classList.remove('drag-over-child', 'drag-over-sibling', 'drag-over-sibling-top'));
-        };
-
-        const handleDragEnd = e => {
-            e.target.closest('.node').classList.remove('dragging');
-            draggedNode = null;
-            document.querySelectorAll('.node').forEach(node => node.classList.remove('drag-over-child', 'drag-over-sibling', 'drag-over-sibling-top'));
-            document.querySelectorAll('.add-btn').forEach(btn => {
-                btn.style.boxShadow = 'none';
-                btn.classList.remove('drop-target');
-            });
-        };
-
-        const handleTouchMove = e => {
-            if (!draggedNode || e.touches.length > 1) return;
-            e.preventDefault();
-            const touch = e.touches[0];
-            document.querySelectorAll('.node').forEach(n => n.classList.remove('drag-over-child', 'drag-over-sibling', 'drag-over-sibling-top'));
-            const targetNode = getTargetElement(touch.clientX, touch.clientY)?.closest('.node');
-            if (targetNode && parseInt(targetNode.dataset.nodeId) !== draggedNode) {
-                const rect = targetNode.getBoundingClientRect();
-                const offsetY = touch.clientY - rect.top;
-                const nodeToMove = mindmapData.find(n => n.id === draggedNode);
-                const targetNodeData = mindmapData.find(n => n.id === parseInt(targetNode.dataset.nodeId));
-                if (nodeToMove && targetNodeData && nodeToMove.parent === targetNodeData.parent && nodeToMove.level > 0) {
-                    const threshold = rect.height / 3;
-                    if (offsetY < threshold) {
-                        targetNode.classList.add('drag-over-sibling-top');
-                    } else if (offsetY > rect.height - threshold) {
-                        targetNode.classList.add('drag-over-sibling');
-                    } else {
-                        targetNode.classList.add('drag-over-child');
-                    }
-                } else {
-                    targetNode.classList.add('drag-over-child');
-                }
-            }
-        };
-
-        const handleTouchEnd = e => {
-            if (!draggedNode) return;
-            e.preventDefault();
-            const touch = e.changedTouches[0];
-            const targetElement = getTargetElement(touch.clientX, touch.clientY);
-            const targetNode = targetElement?.closest('.node');
-            const dropZone = targetElement?.closest('.add-btn');
-
-            if (dropZone && draggedNode !== parseInt(dropZone.dataset.nodeId)) {
-                moveNodeAdvanced(draggedNode, parseInt(dropZone.dataset.nodeId), 'child');
-            } else if (targetNode && draggedNode !== parseInt(targetNode.dataset.nodeId)) {
-                const rect = targetNode.getBoundingClientRect();
-                const offsetY = touch.clientY - rect.top;
-                const nodeToMove = mindmapData.find(n => n.id === draggedNode);
-                const targetNodeData = mindmapData.find(n => n.id === parseInt(targetNode.dataset.nodeId));
-                let dropType = 'child';
-                if (nodeToMove.parent === targetNodeData.parent && nodeToMove.level > 0) {
-                    const threshold = rect.height / 3;
-                    if (offsetY < threshold) {
-                        dropType = 'before';
-                    } else if (offsetY > rect.height - threshold) {
-                        dropType = 'after';
-                    }
-                }
-                moveNodeAdvanced(draggedNode, parseInt(targetNode.dataset.nodeId), dropType);
-            }
-
-            document.querySelectorAll('.node').forEach(node => node.classList.remove('dragging', 'drag-over-child', 'drag-over-sibling', 'drag-over-sibling-top'));
-            document.querySelectorAll('.add-btn').forEach(btn => {
-                btn.style.boxShadow = 'none';
-                btn.classList.remove('drop-target');
-            });
-            draggedNode = null;
-        };
-
-        const moveNodeAdvanced = (nodeId, targetNodeId, dropType) => {
-            const nodeToMove = mindmapData.find(n => n.id === nodeId);
-            const targetNode = mindmapData.find(n => n.id === targetNodeId);
-            if (!nodeToMove || !targetNode) return;
-            if (isDescendant(nodeToMove.id, targetNode.id)) {
-                return showErrorModal('Ein Knoten kann nicht zu seinem eigenen Unterknoten verschoben werden!');
-            }
-
-            if (dropType === 'child') {
-                const childrenCount = mindmapData.filter(node => node.parent === targetNode.id && node.id !== nodeToMove.id).length;
-                if (childrenCount >= MAX_CHILDREN_PER_NODE) {
-                    return showErrorModal(`Der Zielknoten hat bereits die maximale Anzahl von ${MAX_CHILDREN_PER_NODE} Unterknoten erreicht.`);
-                }
-                const maxDepth = getMaxDepth(nodeToMove.id);
-                const newLevel = targetNode.level + 1;
-                if (newLevel + maxDepth > MAX_LEVEL) {
-                    return showErrorModal(`Das Verschieben würde die maximale Tiefe von ${MAX_LEVEL} Ebenen überschreiten.`);
-                }
-                nodeToMove.parent = targetNode.id;
-                nodeToMove.level = newLevel;
-                const siblings = mindmapData.filter(node => node.parent === targetNode.id && node.id !== nodeToMove.id)
-                    .sort((a, b) => (a.order || 0) - (b.order || 0));
-                nodeToMove.order = siblings.length > 0 ? Math.max(...siblings.map(s => s.order || 0)) + 1 : 0;
-                nodeToMove.branchIndex = targetNode.level === 0 ? siblings.length : targetNode.branchIndex;
-                nodeToMove.isCollapsed = newLevel === 1 ? false : undefined;
-                if (targetNode.level === 1) targetNode.isCollapsed = false;
-                if (targetNode.level === 0 && welcomeMessage) welcomeMessage.style.display = 'none';
-            } else if (dropType === 'before' || dropType === 'after') {
-                if (nodeToMove.parent !== targetNode.parent || nodeToMove.level === 0) {
-                    return showErrorModal('Knoten können nur innerhalb derselben Hierarchieebene neu angeordnet werden.');
-                }
-                const siblings = mindmapData.filter(node => node.parent === nodeToMove.parent && node.id !== nodeToMove.id)
-                    .sort((a, b) => (a.order || 0) - (b.order || 0));
-                const targetIndex = siblings.findIndex(s => s.id === targetNode.id);
-                const newOrder = dropType === 'before' ? (targetNode.order || 0) : (targetNode.order || 0) + 1;
-                nodeToMove.order = newOrder;
-                siblings.splice(targetIndex + (dropType === 'after' ? 1 : 0), 0, nodeToMove);
-                siblings.forEach((sibling, index) => {
-                    sibling.order = index + 1000;
-                    sibling.branchIndex = nodeToMove.parent === null ? index : mindmapData.find(n => n.id === nodeToMove.parent).branchIndex;
-                });
-            }
-
-            updateChildrenLevels(nodeToMove.id, nodeToMove.level);
-            normalizeOrders();
-            renderEditor();
-            renderMindmap();
-        };
-
-        // Help functions for node structure
-        const getMaxDepth = nodeId => {
-            const node = mindmapData.find(n => n.id === nodeId);
-            if (!node) return 0;
-            const children = mindmapData.filter(n => n.parent === nodeId);
-            return children.length ? Math.max(...children.map(child => 1 + getMaxDepth(child.id))) : 0;
-        };
-
-        const isDescendant = (ancestorId, nodeId) => {
-            const node = mindmapData.find(n => n.id === nodeId);
-            if (!node || node.parent === null) return false;
-            return node.parent === ancestorId || isDescendant(ancestorId, node.parent);
-        };
-
-        const updateChildrenLevels = (nodeId, newLevel) => {
-            mindmapData.filter(n => n.parent === nodeId).forEach(child => {
-                child.level = newLevel + 1;
-                child.branchIndex = mindmapData.find(n => n.id === nodeId).branchIndex;
-                child.isCollapsed = child.level === 1 ? false : undefined;
-                updateChildrenLevels(child.id, child.level);
-            });
-        };
-
-        const normalizeOrders = () => {
-            const groups = {};
-            mindmapData.forEach(node => {
-                const key = node.parent === null ? 'root' : node.parent;
-                groups[key] = groups[key] || [];
-                groups[key].push(node);
-            });
-            Object.values(groups).forEach(group => {
-                group.sort((a, b) => (a.order || 0) - (b.order || 0) || a.id - b.id)
-                    .forEach((node, index) => node.order = index + 1000);
-            });
-        };
-
-        // Mermaid and SVG generation
-        const generateMermaidCode = () => {
-            if (!mindmapData.length) return 'mindmap|root(Hauptknoten)';
-            const rootNode = mindmapData.find(node => node.level === 0);
-            if (!rootNode) return 'mindmap|root(Hauptknoten)';
-            const addNodeToMermaid = (node, level = 0) => {
-                const indent = '~'.repeat(level);
-                const text = node.text.replace(/[]/g, '');
-                let nodeCode = node.level === 0 ? `${indent}root(${text})` : `${indent}${text}`;
-                const children = mindmapData.filter(child => child.parent === node.id).sort((a, b) => (a.order || 0) - (b.order || 0));
-                return nodeCode + children.map(child => '|' + addNodeToMermaid(child, level + 1)).join('');
-            };
-            return 'mindmap|' + addNodeToMermaid(rootNode);
-        };
-
-        const buildTreeFromData = () => {
-            const nodesMap = new Map(mindmapData.map(node => [node.id, { ...node, children: [] }]));
-            let root = null;
-            nodesMap.forEach(node => {
-                if (node.level === 0) root = node;
-                if (node.parent !== null) {
-                    const parent = nodesMap.get(node.parent);
-                    if (parent) parent.children.push(node);
-                }
-            });
-            const sortChildren = node => {
-                node.children.sort((a, b) => (a.order || 0) - (b.order || 0));
-                node.children.forEach(sortChildren);
-            };
-            if (root) sortChildren(root);
-            return root;
-        };
-
-        // Assign colors for branches
-        const assignBranchColors = node => {
-            const colorThemeSelect = document.getElementById('[[color_theme#id]]');
-            let selectedScheme = colorThemeSelect?.options[colorThemeSelect.selectedIndex]?.value || 'Standard';
-            node.color = node.level === 0 ? BRANCH_COLORS_SCHEMES[selectedScheme].level0 :
-                node.level < BRANCH_COLORS.length ? BRANCH_COLORS[node.level] : '#999';
-            node.textColor = getContrastTextColor(node.color);
-            node.borderColor = node.level === 0 ? BRANCH_COLORS_SCHEMES[selectedScheme].level0 : node.color;
-            node.children.forEach((child, index) => {
-                assignBranchColors(child);
-            });
-        };
-
-        const countNodes = node => 1 + node.children.reduce((sum, child) => sum + countNodes(child), 0);
-
-        // Calculate sub-tree size
-        const calculateSubtreeSize = (node) => {
-            const fontSize = Math.max(12, 18 - node.level);
-            const maxWidth = 200;
-            const words = node.text.split(' ').flatMap(word => {
-                if (measureTextWidth(word, fontSize) > maxWidth) {
-                    return splitLongWord(word, maxWidth, fontSize);
-                }
-                return word;
-            });
-            let line = '';
-            const lines = [];
-
-            words.forEach(word => {
-                const testLine = line + word + ' ';
-                if (measureTextWidth(testLine, fontSize) > maxWidth && line.length > 0) {
-                    lines.push(line.trim());
-                    line = word + ' ';
-                } else {
-                    line = testLine;
-                }
-            });
-            if (line.length > 0) lines.push(line.trim());
-
-            const lineHeight = fontSize * 1.2;
-            node.height = lines.length * lineHeight + 20;
-            node.width = Math.max(100, maxWidth + 20);
-
-            if (!node.children.length) {
-                node.subtreeWidth = node.width;
-                node.subtreeHeight = node.height;
-                return;
-            }
-            node.children.forEach(calculateSubtreeSize);
-            const spacing = Math.max(10, ...node.children.map(child => child.height * 0.5));
-            node.subtreeHeight = node.children.reduce((sum, child) => sum + child.subtreeHeight, 0) + Math.max(0, node.children.length - 1) * spacing;
-            node.subtreeWidth = node.width + 100 + Math.max(...node.children.map(c => c.subtreeWidth));
-        };
-
-        // Position nodes
-        const positionNode = (node, x, y, direction) => {
-            if (typeof node.x === 'undefined') {
-                node.x = direction === 'left' ? x - node.width : x;
-            }
-            node.y = y + (node.subtreeHeight - node.height) / 2;
-            const spacing = Math.max(10, ...node.children.map(child => child.height * 0.5));
-            let currentY = y;
-            node.children.sort((a, b) => (a.order || 0) - (b.order || 0));
-            node.children.forEach(child => {
-                const childDirection = child.direction || direction;
-                const offset = 100;
-                const childX = childDirection === 'right' ? node.x + node.width + offset : node.x - offset;
-                positionNode(child, childX, currentY, childDirection);
-                currentY += child.subtreeHeight + spacing;
-            });
-        };
-
-        // Calculate layout
-        const calculateLayout = (node, level = 0) => {
-            if (level === 0) {
-                calculateSubtreeSize(node);
-                let rightChildren = [];
-                let leftChildren = [];
-                node.children.sort((a, b) => (a.order || 0) - (b.order || 0));
-                node.children.forEach((child, index) => {
-                    child.direction = index % 2 === 0 ? 'right' : 'left';
-                    if (child.direction === 'right') rightChildren.push(child);
-                    else leftChildren.push(child);
-                });
-
-                const spacing = Math.max(10, ...node.children.map(child => child.height * 0.5));
-
-                let rightTotalHeight = rightChildren.reduce((sum, c) => sum + c.subtreeHeight, 0) + Math.max(0, rightChildren.length - 1) * spacing;
-                let leftTotalHeight = leftChildren.reduce((sum, c) => sum + c.subtreeHeight, 0) + Math.max(0, leftChildren.length - 1) * spacing;
-                let maxTotalHeight = Math.max(leftTotalHeight, rightTotalHeight, node.height);
-
-                const maxRightWidth = rightChildren.reduce((max, c) => Math.max(max, c.subtreeWidth), 0);
-                const maxLeftWidth = leftChildren.reduce((max, c) => Math.max(max, c.subtreeWidth), 0);
-                const maxBranchWidth = Math.max(maxRightWidth, maxLeftWidth);
-                const totalWidth = node.width + 2 * maxBranchWidth + 200;
-
-                node.x = maxBranchWidth + 100;
-                node.y = maxTotalHeight / 2 - node.height / 2;
-
-                let rightY = node.y + node.height / 2 - rightTotalHeight / 2;
-                rightChildren.forEach(child => {
-                    positionNode(child, node.x + node.width + 100, rightY, 'right');
-                    rightY += child.subtreeHeight + spacing;
-                });
-
-                let leftY = node.y + node.height / 2 - leftTotalHeight / 2;
-                leftChildren.forEach(child => {
-                    const rightEdgeX = node.x - 100;
-                    positionNode(child, rightEdgeX, leftY, 'left');
-                    leftY += child.subtreeHeight + spacing;
-                });
-            }
-        };
-
-        // Calculate connection points
-        const getConnectionPoint = (fromNode, toNode) => {
-            const fromCenterX = fromNode.x + fromNode.width / 2;
-            const fromCenterY = fromNode.y + fromNode.height / 2;
-            const toCenterX = toNode.x + toNode.width / 2;
-            const toCenterY = toNode.y + toNode.height / 2;
-            const dx = toCenterX - fromCenterX;
-            const dy = toCenterY - fromCenterY;
-            const distance = Math.sqrt(dx * dx + dy * dy);
-            const normalizedDx = dx / distance;
-            const normalizedDy = dy / distance;
-            return {
-                fromX: fromCenterX + normalizedDx * (fromNode.width / 2),
-                fromY: fromCenterY + normalizedDy * (fromNode.height / 2),
-                toX: toCenterX - normalizedDx * (toNode.width / 2),
-                toY: toCenterY - normalizedDy * (toNode.height / 2)
-            };
-        };
-
-        // Generate SVG
-        const generateSVG = root => {
-            if (!root) return '';
-            const padding = 100;
-            assignBranchColors(root);
-            calculateLayout(root);
-            const { minX, minY, maxX, maxY } = getBounds(root);
-            const width = maxX - minX + padding * 2;
-            const height = maxY - minY + padding * 2;
-            let svg = `<svg width="${width}" height="${height}" viewBox="${minX - padding} ${minY - padding} ${width} ${height}" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">`;
-            const drawConnections = node => {
-                node.children.forEach(child => {
-                    const { fromX, fromY, toX, toY } = getConnectionPoint(node, child);
-                    svg += `<line x1="${fromX}" y1="${fromY}" x2="${toX}" y2="${toY}" stroke="${BRANCH_COLORS[child.branchIndex % BRANCH_COLORS.length] || '#667eea'}" stroke-width="2" stroke-linecap="round"/>`;
-                    drawConnections(child);
-                });
-            };
-            const drawNodes = node => {
-                const colorThemeSelect = document.getElementById('[[color_theme#id]]');
-                let selectedScheme = colorThemeSelect?.options[colorThemeSelect.selectedIndex]?.value || 'Standard';
-                const { fillColor, fillOpacity, strokeColor, strokeWidth, strokeDasharray } = node.level === 0
-                    ? { fillColor: BRANCH_COLORS_SCHEMES[selectedScheme].level0, strokeColor: BRANCH_COLORS_SCHEMES[selectedScheme].level0, strokeWidth: 2, strokeDasharray: 'none' }
-                    : node.level === 1
-                        ? { fillColor: BRANCH_COLORS[node.branchIndex % BRANCH_COLORS.length], strokeColor: BRANCH_COLORS[node.branchIndex % BRANCH_COLORS.length], strokeWidth: 2, strokeDasharray: 'none' }
-                        : node.level === 2
-                            ? { fillColor: BRANCH_COLORS[node.branchIndex % BRANCH_COLORS.length], fillOpacity: '0.6', strokeColor: BRANCH_COLORS[node.branchIndex % BRANCH_COLORS.length], strokeWidth: 2, strokeDasharray: '5,3' }
-                            : { fillColor: '#ffffff', strokeColor: BRANCH_COLORS[node.branchIndex % BRANCH_COLORS.length], strokeWidth: 2, strokeDasharray: '5,3' };
-                const textColor = getContrastTextColor(fillColor);
-                svg += `<rect data-node-id="${node.id}" class="node-rect" x="${node.x}" y="${node.y}" width="${node.width}" height="${node.height}" rx="8" fill="${fillColor}" fill-opacity="${fillOpacity}" stroke="${strokeColor}" stroke-width="${strokeWidth}" stroke-dasharray="${strokeDasharray}"/>`;
-                const words = node.text.split(' ').flatMap(word => {
-                    const fontSize = Math.max(12, 18 - node.level);
-                    if (measureTextWidth(word, fontSize) > 200) {
-                        return splitLongWord(word, 200, fontSize);
-                    }
-                    return word;
-                });
-                let line = '';
-                const lines = [];
-                const maxWidth = 200;
-                const fontSize = Math.max(12, 18 - node.level);
-                words.forEach(word => {
-                    const testLine = line + word + ' ';
-                    if (measureTextWidth(testLine, fontSize) > maxWidth && line.length > 0) {
-                        lines.push(line.trim());
-                        line = word + ' ';
-                    } else {
-                        line = testLine;
-                    }
-                });
-                if (line.length > 0) lines.push(line.trim());
-                const lineHeight = fontSize * 1.2;
-                const totalTextHeight = lines.length * lineHeight;
-                const startY = node.y + (node.height - totalTextHeight) / 2 + lineHeight * 0.7;
-                lines.forEach((textLine, index) => {
-                    svg += `<text data-node-id="${node.id}" class="node-text" x="${node.x + node.width / 2}" y="${startY + index * lineHeight}" font-size="${fontSize}" font-family="Inter, system-ui, sans-serif" fill="${textColor}" text-anchor="middle" font-weight="${node.level === 0 ? '600' : '400'}">${textLine}</text>`;
-                });
-                node.children.forEach(drawNodes);
-            };
-            drawConnections(root);
-            drawNodes(root);
-            svg += '</svg>';
-            return svg;
-        };
-
-        // Grenzen berechnen
-        const getBounds = root => {
-            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-            const updateBounds = node => {
-                minX = Math.min(minX, node.x);
-                minY = Math.min(minY, node.y);
-                maxX = Math.max(maxX, node.x + node.width);
-                maxY = Math.max(maxY, node.y + node.height);
-                node.children.forEach(updateBounds);
-            };
-            updateBounds(root);
-            return { minX, minY, maxX, maxY };
-        };
-
-        // Render mind maps
-        const renderMindmap = () => {
-            if (!mermaidInput) return;
-            mermaidInput.value = generateMermaidCode();
-            if (!previewContainer) return;
-            previewContainer.innerHTML = '<div class="loading">Rendere Mindmap...</div>';
-            try {
-                const root = buildTreeFromData();
-                const svg = generateSVG(root);
-                previewContainer.innerHTML = `<div id="mermaid-container-${Date.now()}" class="mermaid-container">${svg}</div>`;
-                const existingOverlay = document.querySelector('.node-action-overlay, .input-overlay');
-                if (existingOverlay) existingOverlay.remove();
-                const svgContainer = previewContainer.querySelector('svg');
-                if (svgContainer) {
-                    svgContainer.addEventListener('click', (e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        const existingOverlay = document.querySelector('.node-action-overlay, .input-overlay');
-                        if (existingOverlay) existingOverlay.remove();
-                        const target = e.target.closest('[data-node-id]');
-                        if (target) {
-                            const nodeId = parseInt(target.getAttribute('data-node-id'));
-                            const node = mindmapData.find(n => n.id === nodeId);
-                            if (!node) {
-                                showErrorModal('Knoten nicht gefunden.');
-                                return;
-                            }
-                            if (node.level === 0 && !hasInteractedWithRoot) {
-                                hasInteractedWithRoot = true;
-                                if (welcomeMessage) welcomeMessage.style.display = 'none';
-                            }
-                            if (node.level === 0 && e.target.classList.contains('delete-btn')) {
-                                showErrorModal('Der Hauptknoten kann nicht gelöscht werden.');
-                                return;
-                            }
-                            const rects = svgContainer.querySelectorAll(`rect[data-node-id="${nodeId}"]`);
-                            const texts = svgContainer.querySelectorAll(`text[data-node-id="${nodeId}"]`);
-                            [rects, texts].forEach(elements => {
-                                elements.forEach(el => {
-                                    el.classList.add('node-highlighted');
-                                    setTimeout(() => el.classList.remove('node-highlighted'), 500);
-                                });
-                            });
-
-                            const rect = target.getBoundingClientRect();
-                            const zoomFactor = currentZoom || 1;
-                            const overlay = document.createElement('div');
-                            overlay.className = 'node-action-overlay';
-                            overlay.style.left = `${rect.left + window.scrollX}px`;
-                            overlay.style.top = `${rect.bottom + window.scrollY + 5}px`;
-                            overlay.innerHTML = `
-                                <button class="edit-btn" title="Knoten bearbeiten"><i class="fa-solid fa-edit"></i></button>
-                                <button class="plus-btn" title="Neuer Unterknoten"><i class="fa-solid fa-plus"></i></button>
-                                <button class="delete-btn" title="Knoten löschen"><i class="fa-solid fa-trash"></i></button>
-                            `;
-                            document.body.appendChild(overlay);
-                            overlay.querySelector('.edit-btn').addEventListener('click', (e) => {
-                                e.stopPropagation();
-                                overlay.remove();
-                                const inputOverlay = document.createElement('div');
-                                inputOverlay.className = 'input-overlay';
-                                const overlayWidth = (rect.width / zoomFactor) * 1;
-                                inputOverlay.style.left = `${rect.left + window.scrollX - (overlayWidth - rect.width / zoomFactor) / 2}px`;
-                                inputOverlay.style.top = `${rect.top + window.scrollY}px`;
-                                inputOverlay.style.width = `${overlayWidth}px`;
-                                inputOverlay.style.height = `${rect.height / zoomFactor}px`;
-                                const input = document.createElement('input');
-                                input.type = 'text';
-                                input.value = node.text;
-                                const colorThemeSelect = document.getElementById('[[color_theme#id]]');
-                                let selectedScheme = colorThemeSelect?.options[colorThemeSelect.selectedIndex]?.value || 'Standard';
-                                const inputBackgroundColor = node.level === 0 ? BRANCH_COLORS_SCHEMES[selectedScheme].level0 :
-                                    node.level === 1 ? BRANCH_COLORS[node.branchIndex % BRANCH_COLORS.length] :
-                                        node.level === 2 ? BRANCH_COLORS[node.branchIndex % BRANCH_COLORS.length] :
-                                            '#ffffff';
-                                input.style.backgroundColor = inputBackgroundColor;
-                                input.style.color = getContrastTextColor(inputBackgroundColor);
-                                inputOverlay.appendChild(input);
-                                document.body.appendChild(inputOverlay);
-                                input.focus();
-                                input.select();
-
-                                let isSaving = false;
-
-                                input.addEventListener('input', () => {
-                                    validateInputLength(input, nodeId);
-                                });
-
-                                const saveInput = () => {
-                                    if (isSaving) return;
-                                    isSaving = true;
-                                    if (validateNodeText(input.value, input)) {
-                                        updateNodeText(nodeId, input.value, input);
-                                        renderEditor();
-                                    }
-                                    if (inputOverlay.isConnected) {
-                                        inputOverlay.remove();
-                                    }
-                                    document.removeEventListener('click', closeInputOverlay);
-                                    isSaving = false;
-                                };
-
-                                input.addEventListener('blur', saveInput);
-                                input.addEventListener('keydown', (e) => {
-                                    if (e.key === 'Enter' || e.keyCode === 13) {
-                                        e.preventDefault();
-                                        saveInput();
-                                    }
-                                });
-
-                                const closeInputOverlay = (e) => {
-                                    if (!inputOverlay.contains(e.target)) {
-                                        saveInput();
-                                    }
-                                };
-                                document.addEventListener('click', closeInputOverlay);
-                            });
-                            overlay.querySelector('.plus-btn').addEventListener('click', (e) => {
-                                e.stopPropagation();
-                                if (!node || node.id !== nodeId) {
-                                    showErrorModal('Fehler: Ungültiger Knoten ausgewählt.');
-                                    overlay.remove();
-                                    return;
-                                }
-                                if (node.level >= MAX_LEVEL) {
-                                    showErrorModal(`Die maximale Tiefe von ${MAX_LEVEL} Ebenen wurde erreicht.`);
-                                    overlay.remove();
-                                    return;
-                                }
-                                const children = mindmapData.filter(n => n.parent === nodeId);
-                                if (children.length >= MAX_CHILDREN_PER_NODE) {
-                                    showErrorModal(`Der Elternknoten hat bereits die maximale Anzahl von ${MAX_CHILDREN_PER_NODE} Unterknoten erreicht.`);
-                                    overlay.remove();
-                                    return;
-                                }
-                                addChildNode(nodeId, true);
-                                overlay.remove();
-                            });
-                            overlay.querySelector('.delete-btn').addEventListener('click', (e) => {
-                                e.stopPropagation();
-                                overlay.remove();
-                                showDeleteModal(nodeId);
-                            });
-                            const closeOverlay = (e) => {
-                                if (!overlay.contains(e.target) && !target.contains(e.target)) {
-                                    overlay.remove();
-                                    document.removeEventListener('click', closeOverlay);
-                                }
-                            };
-                            document.addEventListener('click', closeOverlay);
-                        }
-                    });
-                }
-                if (welcomeMessage && typeof hasInteractedWithRoot !== 'undefined' && !hasInteractedWithRoot && !mindmapData.some(node => node.parent !== null)) {
-                    welcomeMessage.style.display = 'block';
-                } else if (welcomeMessage) {
-                    welcomeMessage.style.display = 'none';
-                }
-            } catch (error) {
-                const mermaidCode = mermaidInput.value.split('|').map(line => {
-                    const match = line.match(/^(~*)[^~]*/);
-                    return match ? ' '.repeat(match[1]?.length || 0) + match[0].replace(/^~*/, '') : line;
-                }).join('\n');
-                previewContainer.innerHTML = `
-                    <div style="background: #f1f3f4; padding: 20px; border-radius: 12px; border-left: 4px solid #dc2626;">
-                        <h4 style="margin: 0 0 10px 0; color: #dc2626;">⚠️ Vorschau nicht verfügbar</h4>
-                        <p style="color: #6b7280; margin: 0 0 15px 0; font-size: 14px;">Rendering-Fehler: ${error.message}</p>
-                        <h5 style="margin: 15px 0 10px 0; color: #1f2937;">📋 Generierter Code:</h5>
-                        <pre style="background: white; padding: 15px; border-radius: 8px; font-family: 'Courier New', monospace; font-size: 13px; line-height: 1.4; overflow-x: auto; margin: 0; border: 1px solid #e5e7eb;">${mermaidCode}</pre>
-                    </div>
-                `;
-                if (welcomeMessage) welcomeMessage.style.display = 'none';
-            }
-        };
-
-        function togglePresentationMode() {
-            const fsContainer = document.getElementById("fullscreen_mindmap");
-            const previewPanel = document.querySelector('.preview-panel');
-            const toggleButton = document.querySelector('.toggle-fullscreen-btn');
-
-            if (fsContainer.classList.contains('fullscreen-mode')) {
-                fsContainer.classList.remove('fullscreen-mode');
-                previewPanel.style.overflow = 'auto';
-                resetZoom();
-            } else {
-                fsContainer.classList.add('fullscreen-mode');
-                previewPanel.style.overflow = 'hidden';
-            }
-        }
-
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && document.getElementById("fullscreen_mindmap").classList.contains('fullscreen-mode')) {
-                togglePresentationMode();
-            }
-        });
-
-      
-
- 
-    </script>
 </div>
+
+<div class=" added_field">
+    <div class="mt-4">
+        <p class="mt-2">[[notes]]</p>
+    </div>
+</div>
+
+<span class="small">Regelmäßig Zwischenspeichern nicht vergessen!</span>
+
+<!-- Modal -->
+<div class="modal fade" id="observationModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Ändern</i></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <input type="text" id="timeInput" class="form-control" placeholder="z.B. 09:15">
+                </div>
+                <div class="mb-4">
+                     <div class="d-flex align-items-center">
+                        <input type="range" class="form-range me-3" min="0" max="100" step="10" id="engagementSlider">
+                        <span id="engagementValue" style="font-weight:bold; min-width:40px; text-align:center;">50</span> %
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <textarea id="textInput" class="form-control" rows="5"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                <button type="button" id="saveObservation" class="btn btn-primary" data-bs-dismiss="modal">Speichern</button>
+                <button type="button" id="deleteObservation" class="btn btn-danger" style="display:none;" data-bs-dismiss="modal">Löschen</button>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+    const svg = document.getElementById('chart');
+    const chartContainer = document.getElementById('chartContainer');
+    const height = 500;
+    const margin = { top: 40, right: 60, bottom: 50, left: 60 };
+    let plotHeight = height - margin.top - margin.bottom;
+
+    const plotGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    plotGroup.setAttribute('transform', `translate(${margin.left},${margin.top})`);
+    svg.appendChild(plotGroup);
+
+    const gridGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    const pointsGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    const xAxisGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    const yAxisGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    plotGroup.appendChild(gridGroup);
+    plotGroup.appendChild(pointsGroup);
+    plotGroup.appendChild(xAxisGroup);
+    plotGroup.appendChild(yAxisGroup);
+
+    const tableBody = document.querySelector('#observationTable tbody');
+    const noDataMsg = document.getElementById('noData');
+
+    let observations = [];
+    let currentEditIndex = -1;
+    let expandedCluster = null;
+
+    const slider = document.getElementById('engagementSlider');
+    const valueDisplay = document.getElementById('engagementValue');
+    slider.addEventListener('input', () => valueDisplay.textContent = slider.value);
+
+// Farbe aus ColorPicker auslesen
+let colorInput = document.getElementById("color");
+let color = document.getElementById("[[color#id]]")
+let currentColor = color.value;
+function updateCurrentColor() {
+        color.value = colorInput.value;
+   currentColor = color.value;      
+  console.log(currentColor);
+        // Diagramm sofort neu zeichnen, damit die neue Farbe übernommen wird
+        updateChart();
+    }
+colorInput.addEventListener("input", updateCurrentColor);
+
+
+    function formatTime(date) {
+        return date.toTimeString().slice(0, 5);
+    }
+
+    function timeToMinutes(timeStr) {
+        const [h, m] = timeStr.split(':').map(Number);
+        return h * 60 + m;
+    }
+
+    function prepareNewObservation() {
+        currentEditIndex = -1;
+        document.getElementById('timeInput').value = formatTime(new Date());
+        slider.value = 50;
+        valueDisplay.textContent = 50;
+        document.getElementById('textInput').value = '';
+        document.getElementById('deleteObservation').style.display = 'none';
+    }
+
+    function fillModal(index) {
+        currentEditIndex = index;
+        const obs = observations[index];
+        document.getElementById('timeInput').value = obs.time;
+        slider.value = obs.engagement;
+        valueDisplay.textContent = obs.engagement;
+        document.getElementById('textInput').value = obs.text || '';
+        document.getElementById('deleteObservation').style.display = 'inline-block';
+    }
+
+    // Modal öffnen – 100% Moodle-sicher, ohne bootstrap-Objekt!
+    function openObservationModal(index) {
+        fillModal(index);
+        const btn = document.createElement('button');
+        btn.setAttribute('data-bs-toggle', 'modal');
+        btn.setAttribute('data-bs-target', '#observationModal');
+        document.body.appendChild(btn);
+        btn.click();
+        document.body.removeChild(btn);
+    }
+
+    function updateTable() {
+        tableBody.innerHTML = '';
+        if (observations.length === 0) {
+            noDataMsg.style.display = 'block';
+            return;
+        }
+        noDataMsg.style.display = 'none';
+
+        const sorted = [...observations].sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time));
+
+        sorted.forEach((obs) => {
+            const originalIndex = observations.indexOf(obs);
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${obs.time}</td>
+                <td>${obs.engagement}</td>
+                <td>${obs.text ? obs.text.replace(/</g, '&lt;') : '–'}</td>
+                <td>
+                    <button type="button" class="btn btn-sm btn-outline-primary"
+                            data-bs-toggle="modal" data-bs-target="#observationModal"
+                            onclick="openObservationModal(${originalIndex})">
+                        <i class="fa-regular fa-pen-to-square"></i>
+                    </button>
+                </td>
+            `;
+            tableBody.appendChild(row);
+        });
+    }
+
+    function updateChart() {
+        gridGroup.innerHTML = '';
+        pointsGroup.innerHTML = '';
+        xAxisGroup.innerHTML = '';
+        yAxisGroup.innerHTML = '';
+        if (expandedCluster) expandedCluster.remove();
+
+        const jsonField = document.getElementById('[[json#id]]');
+        if (jsonField) {
+            jsonField.value = observations.length === 0 ? '[]' : JSON.stringify(observations);
+        }
+
+        updateTable();
+
+        if (observations.length === 0) {
+            svg.setAttribute('width', 900);
+            return;
+        }
+
+        const minutesArray = observations.map(o => timeToMinutes(o.time));
+        let minMinutes = Math.min(...minutesArray) - 5;
+        let maxMinutes = Math.max(...minutesArray) + 5;
+        minMinutes = Math.floor(minMinutes / 5) * 5;
+        maxMinutes = Math.ceil(maxMinutes / 5) * 5;
+
+        const totalMinutes = maxMinutes - minMinutes;
+        const pixelsPer10Min = 250;
+        let plotWidth = totalMinutes * (pixelsPer10Min / 10);
+        plotWidth = Math.max(plotWidth, 840);
+
+        const width = plotWidth + margin.left + margin.right;
+        svg.setAttribute('width', width);
+        chartContainer.style.width = width + 'px';
+        plotHeight = height - margin.top - margin.bottom;
+
+        const xScale = m => (m - minMinutes) / totalMinutes * plotWidth;
+        const yScale = v => plotHeight - ((v + 5) / 110) * plotHeight;
+  gridGroup.innerHTML = '';
+    xAxisGroup.innerHTML = '';
+    yAxisGroup.innerHTML = '';
+
+        xAxisGroup.setAttribute('transform', `translate(0,${plotHeight})`);
+
+        for (let m = minMinutes; m <= maxMinutes; m += 5) {
+            const x = xScale(m);
+            const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line.setAttribute('x1', x); line.setAttribute('y1', 0);
+            line.setAttribute('x2', x); line.setAttribute('y2', plotHeight);
+            line.setAttribute('stroke', '#eee');
+            gridGroup.appendChild(line);
+
+        if (m % 10 === 0) {
+            const h = String(Math.floor(m / 60)).padStart(2, '0');
+            const min = String(m % 60).padStart(2, '0');
+            const txt = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            txt.setAttribute('x', x); txt.setAttribute('y', 20);
+            txt.setAttribute('text-anchor', 'middle');
+            txt.setAttribute('font-size', '12');
+            txt.textContent = `${h}:${min}`;
+            xAxisGroup.appendChild(txt);
+        }
+    }
+    // Y-Achse
+    for (let p = 0; p <= 100; p += 10) {
+        const y = yScale(p);
+        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.setAttribute('x1', 0); line.setAttribute('y1', y);
+        line.setAttribute('x2', plotWidth); line.setAttribute('y2', y);
+        line.setAttribute('stroke', '#eee');
+        gridGroup.appendChild(line);
+
+        const txt = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        txt.setAttribute('x', -10); txt.setAttribute('y', y + 5);
+        txt.setAttribute('text-anchor', 'end');
+        txt.setAttribute('font-size', '12');
+        txt.textContent = p;
+        yAxisGroup.appendChild(txt);
+    }
+
+        if (!svg.querySelector('text[y="-40"]')) {
+            const yLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            yLabel.setAttribute('transform', 'rotate(-90)');
+            yLabel.setAttribute('x', -plotHeight/2 - margin.top);
+            yLabel.setAttribute('y', -40);
+            yLabel.setAttribute('text-anchor', 'middle');
+            yLabel.textContent = 'Engagement (%)';
+            svg.appendChild(yLabel);
+        }
+
+        // Clustering
+        const groups = {};
+        observations.forEach((obs, i) => {
+            const key = `${obs.time}|${obs.engagement}`;
+            if (!groups[key]) groups[key] = [];
+            groups[key].push(i);
+        });
+
+        Object.values(groups).forEach(indices => {
+            const first = observations[indices[0]];
+            const cx = xScale(timeToMinutes(first.time));
+            const cy = yScale(first.engagement);
+
+            if (indices.length === 1) {
+                const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                c.setAttribute('cx', cx); c.setAttribute('cy', cy);
+                c.setAttribute('r', 12); c.setAttribute('fill', currentColor);
+                c.setAttribute('stroke', '#000');
+               c.setAttribute('stroke-width', 2);
+                c.style.cursor = 'pointer';
+                c.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    openObservationModal(indices[0]);
+                });
+                pointsGroup.appendChild(c);
+            } else {
+          const count = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    const cluster = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    cluster.setAttribute('cx', cx);
+    cluster.setAttribute('cy', cy);
+    cluster.setAttribute('r', 16);
+    cluster.setAttribute('fill', '#dc3545');
+    cluster.setAttribute('stroke-width', 2);
+    cluster.style.cursor = 'pointer';
+    pointsGroup.appendChild(cluster);
+    count.setAttribute('x', cx);
+    count.setAttribute('y', cy + 5);
+    count.setAttribute('text-anchor', 'middle');
+    count.setAttribute('fill', 'white');
+    count.setAttribute('font-weight', 'bold');
+    count.setAttribute('font-size', '14');
+    count.textContent = indices.length;
+    count.style.pointerEvents = 'none';
+    pointsGroup.appendChild(count);
+                cluster.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    if (expandedCluster) expandedCluster.remove();
+
+                    expandedCluster = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+                    pointsGroup.appendChild(expandedCluster);
+
+                    const radius = 60;
+                    indices.forEach((idx, i) => {
+                        const angle = (i / indices.length) * 2 * Math.PI;
+                        const px = cx + radius * Math.cos(angle);
+                        const py = cy + radius * Math.sin(angle);
+
+                        const p = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                        p.setAttribute('cx', px); p.setAttribute('cy', py);
+                        p.setAttribute('r', 12); p.setAttribute('fill', currentColor);
+    p.setAttribute('opacity', '0.9');
+    p.setAttribute('stroke', '#000');
+                        p.style.cursor = 'pointer';
+                        p.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            openObservationModal(idx);
+                        });
+                        expandedCluster.appendChild(p);
+                    });
+
+                    const close = (e) => {
+                        if (!expandedCluster.contains(e.target)) {
+                            expandedCluster.remove();
+                            expandedCluster = null;
+                            document.removeEventListener('click', close);
+                        }
+                    };
+                    setTimeout(() => document.addEventListener('click', close), 0);
+                });
+            }
+        });
+
+// === VERBINDUNGSLINIEN (gestrichelt, in der Gruppenfarbe) ===
+if (observations.length >= 2) {
+    // Beobachtungen nach Zeit sortieren
+    const sortedObs = [...observations].sort((a, b) => 
+        timeToMinutes(a.time) - timeToMinutes(b.time)
+    );
+
+    for (let i = 0; i < sortedObs.length - 1; i++) {
+        const obs1 = sortedObs[i];
+        const obs2 = sortedObs[i + 1];
+
+        const x1 = xScale(timeToMinutes(obs1.time));
+        const y1 = yScale(obs1.engagement);
+        const x2 = xScale(timeToMinutes(obs2.time));
+        const y2 = yScale(obs2.engagement);
+
+        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.setAttribute('x1', x1);
+        line.setAttribute('y1', y1);
+        line.setAttribute('x2', x2);
+        line.setAttribute('y2', y2);
+        line.setAttribute('stroke', currentColor);  // Die Farbe der Gruppe/Punkte
+        line.setAttribute('stroke-width', 2);
+        line.setAttribute('stroke-dasharray', '6 4'); // Gestrichelt: 6px Strich, 4px Lücke
+        line.setAttribute('opacity', '0.7');          // Etwas transparent
+        line.setAttribute('pointer-events', 'none');  // Klicks gehen durch
+
+        pointsGroup.insertBefore(line, pointsGroup.firstChild); 
+        // Linien hinter den Punkten einfügen
+    }
+}
+    }
+
+    document.getElementById('saveObservation').addEventListener('click', () => {
+        const time = document.getElementById('timeInput').value.trim();
+        const engagement = parseInt(slider.value);
+        const text = document.getElementById('textInput').value.trim();
+
+        if (!/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/.test(time)) {
+            alert('Bitte gültige Uhrzeit im Format HH:MM eingeben');
+            return;
+        }
+
+        const obs = { time, engagement, text };
+        if (currentEditIndex === -1) {
+            observations.push(obs);
+        } else {
+            observations[currentEditIndex] = obs;
+        }
+        updateChart();
+    });
+
+    document.getElementById('deleteObservation').addEventListener('click', () => {
+        if (currentEditIndex !== -1 && confirm('Beobachtung wirklich löschen?')) {
+            observations.splice(currentEditIndex, 1);
+            updateChart();
+        }
+
+// === GESTRICHELTE VERBINDUNGSLINIEN (in der Einzelansicht) ===
+if (observations.length >= 2) {
+    // Beobachtungen nach Zeit sortieren
+    const sortedObs = [...observations].sort((a, b) => 
+        timeToMinutes(a.time) - timeToMinutes(b.time)
+    );
+
+    for (let i = 0; i < sortedObs.length - 1; i++) {
+        const obs1 = sortedObs[i];
+        const obs2 = sortedObs[i + 1];
+
+        const x1 = xScale(timeToMinutes(obs1.time));
+        const y1 = yScale(obs1.engagement);
+        const x2 = xScale(timeToMinutes(obs2.time));
+        const y2 = yScale(obs2.engagement);
+
+        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.setAttribute('x1', x1);
+        line.setAttribute('y1', y1);
+        line.setAttribute('x2', x2);
+        line.setAttribute('y2', y2);
+        line.setAttribute('stroke', '#ccc');           // Deine Gruppenfarbe
+        line.setAttribute('stroke-width', '2');
+        line.setAttribute('stroke-dasharray', '6 4');       // Gestrichelt: 6px Strich, 4px Lücke
+        line.setAttribute('opacity', '0.7');                // Etwas transparent
+        line.setAttribute('pointer-events', 'none');        // Klicks gehen durch
+
+        // Linien hinter die Punkte legen
+        pointsGroup.insertBefore(line, pointsGroup.firstChild);
+    }
+}
+    });
+
+    document.getElementById('exportSVG').addEventListener('click', () => {
+        if (expandedCluster) expandedCluster.remove();
+        const serializer = new XMLSerializer();
+        const source = serializer.serializeToString(svg);
+        const blob = new Blob([source], {type: 'image/svg+xml'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = 'engagement-diagramm.svg';
+        a.click(); URL.revokeObjectURL(url);
+    });
+
+    // JSON laden
+    const jsonField = document.getElementById('[[json#id]]');
+    if (jsonField && jsonField.value && jsonField.value.trim() !== '' && jsonField.value.trim() !== '[]') {
+        try {
+            observations = JSON.parse(jsonField.value);
+        } catch (e) {
+            console.error('Ungültiges JSON:', e);
+            observations = [];
+        }
+    }
+
+    updateChart();
+
+</script>
+
