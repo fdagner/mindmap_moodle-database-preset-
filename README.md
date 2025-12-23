@@ -17,4 +17,4 @@ The preset is available in German, but there is not so much to translate. The te
 
 ## Screenshots
 
-<img width="400" alt="single view" src="/screenshots/einzelansicht.svg">
+<img width="400" alt="single view" src="/screenshots/listenansicht.png">
