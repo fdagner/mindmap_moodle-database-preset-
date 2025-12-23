@@ -4,7 +4,7 @@ lesson study is a preset for the Moodle activity database.
 
 ## Description
 
-Users can create a lesson study.
+Users can record and compare student observations for a lesson study.
 
 ## Getting started
 
@@ -18,3 +18,4 @@ The preset is available in German, but there is not so much to translate. The te
 ## Screenshots
 
 <img width="400" alt="single view" src="/screenshots/einzelansicht.png">
+<img width="400" alt="single view" src="/screenshots/listenansicht.png">
