@@ -15,6 +15,4 @@ Create a "Database" activity in Moodle and then upload the ZIP file.
 
 The preset is available in German, but there is not so much to translate. The template can easily be adapted. 
 
-## Screenshots
 
-<img width="400" alt="single view" src="/screenshots/listenansicht.png">
