@@ -5,7 +5,7 @@
 
 <settings>
 <intro/>
-<comments>1</comments>
+<comments>0</comments>
 <requiredentries>0</requiredentries>
 <requiredentriestoview>0</requiredentriestoview>
 <maxentries>0</maxentries>
@@ -18,30 +18,27 @@
 
 <field>
 <type>text</type>
-<name>json</name>
+<name>mermaid_text</name>
 <required>0</required>
 </field>
 
 <field>
-<type>text</type>
-<name>name</name>
+<type>menu</type>
+<name>color_theme</name>
 <required>0</required>
-</field>
-
-<field>
-<type>text</type>
-<name>color</name>
-<required>0</required>
-</field>
-
-<field>
-<type>textarea</type>
-<name>notes</name>
-<required>0</required>
-<param2>60</param2>
-<param3>35</param3>
-<param4>1</param4>
-<param5>0</param5>
+<param1>Standard
+Hell
+Dunkel
+Winter
+Herbst
+Fr&#xFC;hling
+Sommer
+Kontrast
+Retro
+Pastell
+Monochrom
+Neon
+Rams</param1>
 </field>
 
 </preset>
