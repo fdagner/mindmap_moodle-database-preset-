@@ -1,12 +1,47 @@
-<div class="container">
-    <h1 class="mb-4">Lesson Study</h1>
- <div class="mt-4">
-    <button type="button" id="exportCombinedSVG" class="btn btn-secondary ms-2">
-        <i class="fa-solid fa-download"></i>
-    </button><br><br>
-</div>
-    <div id="chartContainer" style="overflow-x:auto; max-width:100%; background:#fff; padding:10px; border:1px solid #ddd; border-radius:8px;">
-        <svg id="combinedChart" height="600"></svg>
+
+<style>
+    .svg-container-list svg {
+        width: 100%;
+    }
+</style>
+<div class="main-content" id="fullscreen_mindmap">
+
+    <div id="deleteModal" class="mindmap-modal">
+        <div class="mindmap-modal-content">
+            <h3>Knoten löschen</h3>
+            <p id="deleteModalMessage"></p>
+            <div class="mindmap-modal-buttons" id="deleteModalButtons"></div>
+        </div>
+    </div>
+
+    <div id="errorModal" class="mindmap-modal">
+        <div class="mindmap-modal-content">
+            <h3>Fehler</h3>
+            <p id="errorModalMessage"></p>
+            <div class="mindmap-modal-buttons">
+                <button type="button" class="btn btn-primary" onclick="closeErrorModal()">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="successModal" class="mindmap-modal">
+        <div class="mindmap-modal-content">
+            <h3>Erfolg</h3>
+            <p id="successModalMessage"></p>
+            <div class="mindmap-modal-buttons">
+                <button type="button" class="btn btn-primary" onclick="closeSuccessModal()">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="warningModal" class="mindmap-modal">
+        <div class="mindmap-modal-content">
+            <h3>Warnung</h3>
+            <p id="warningModalMessage"></p>
+            <div class="mindmap-modal-buttons">
+                <button type="button" class="btn btn-primary" onclick="closeWarningModal()">OK</button>
+            </div>
+        </div>
     </div>
 
 <!-- Detail-Modal für Beobachtungen in der Listenansicht -->

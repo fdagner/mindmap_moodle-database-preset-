@@ -1,37 +1,81 @@
-<style>
-#[[color#id]] {
-pointer-events:none;
-opacity: 0.5;
-}
-</style>
-<div class="container">
-<div class="d-flex flex-wrap gap-4">
-<div>
-<h5>Name</h5>
-[[name]]</div>
-<div>
-<h5>Farbe wählen:</h5>
-<input type="color" id="color" name="color" ></label><br>
-Aktueller Farbcode: [[color]]<br>
-</div>
-</div>
-       <div class="mb-3">
-        <button type="button"
-                id="addObservation"
-                class="btn btn-primary"
-                data-bs-toggle="modal"
-                data-bs-target="#observationModal"
-                onclick="prepareNewObservation()">
-            <i class="fa-solid fa-plus"></i> Neue Beobachtung
-        </button>
-        <button type="button"
-                id="exportSVG"
-                class="btn btn-secondary ms-2" hidden>
-            <i class="fa-solid fa-download"></i>
-        </button>
+    
+    <style>
+        #[[color_theme#id]] {
+            background-color: #f8f9fa;
+            border-color: #f8f9fa;
+        }
 
- <div id="chartContainer" style="overflow-x:auto;max-width: 100%">
-        <svg id="chart" height="500"></svg>
+        label[for="[[color_theme#id]]"] {
+            display: block;
+        }
+
+        .node.dragging {
+            opacity: 0.5;
+        }
+
+        .node.drag-over-child {
+            background-color: #e6f3ff;
+        }
+
+
+        .node.drag-over-sibling::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background-color: #007bff;
+        }
+
+        .node.drag-over-sibling-top::before {
+            content: '';
+            position: absolute;
+            top: -2px;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background-color: #007bff;
+
+        }
+
+        .add-btn.drop-target {
+            background-color: #d4edda;
+        }
+    </style>
+
+<div class="main-content" id="fullscreen_mindmap">
+    <div class="zoom-controls">
+        <div class="mindmap fullscreen_mindmap">
+            <div class="mindmap_buttons">
+                <button type="button" class="btn btn-light toggle-editor-btn" onclick="toggleEditor()"
+                    title="Listenmodus umschalten"><i class="fa-solid fa-list"></i></button>
+                <button type="button" class="btn btn-light" onclick="zoomSvg(1.2)" title="Hineinzoomen"><i
+                        class="fa-solid fa-magnifying-glass-plus"></i></button>
+                <button type="button" class="btn btn-light" onclick="zoomSvg(1/1.2)" title="Herauszoomen"><i
+                        class="fa-solid fa-magnifying-glass-minus"></i></button>
+                <button type="button" class="btn btn-light" onclick="resetZoom()" title="Zoom zurücksetzen"><i
+                        class="fa-solid fa-arrows-to-circle"></i></button>
+                <button type="button" class="btn btn-light toggle-fullscreen-btn" onclick="togglePresentationMode()" title="Präsentationsmodus"><i
+                        class="fa-solid fa-person-chalkboard"></i></button>
+                [[color_theme]]
+            </div>
+        </div>
+        <div class="editor-panel" style="display: none;">
+            <div id="mindmapEditor" class="mindmap-tree"></div>
+            <div class="export-area" style="display: none;">
+                <strong>Mermaid Code:</strong>
+                [[mermaid_text]]
+            </div>
+        </div>
+        <div class="preview-panel">
+            <div id="mermaidPreview" class="loading">
+                <div id="welcomeMessage">
+                    Klicke auf den Hauptknoten, um zu beginnen 😀...
+                </div>
+                <div id="svgZoomContainer"></div>
+            </div>
+        </div>
     </div>
     </div>
     <div class="mt-5">
