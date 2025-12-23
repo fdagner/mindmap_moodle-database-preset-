@@ -17,17 +17,17 @@
 /**
  * Privacy provider implementation for datapreset_imagegallery.
  *
- * @package    datapreset_mindmap
+ * @package    datapreset_lessonstudy
  * @copyright  2023 Florian Dagner <florian.dagner@outlook.de>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-namespace datapreset_mindmap\privacy;
+namespace datapreset_lessonstudy\privacy;
 
 defined('MOODLE_INTERNAL') || die();
 
 /**
- * Privacy provider implementation for datapreset_geomap.
+ * Privacy provider implementation for datapreset_lessonstudy.
  *
  * @copyright  2023 Florian Dagner <florian.dagner@outlook.de>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
