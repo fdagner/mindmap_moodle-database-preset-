@@ -18,12 +18,12 @@
 /**
  * Strings for component 'datapreset_geomap', language 'en'
  *
- * @package   datapreset_lessonstudy
+ * @package   datapreset_mind map
  * @copyright 2025 Florian Dagner <florian.dagner@outlook.de>
  * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-$string['modulename'] = 'lessonstudy';
-$string['modulename_help'] = 'Users can make a lessonstudy.';
-$string['pluginname'] = 'lessonstudy';
-$string['privacy:metadata'] = 'lessonstudy plugin does not store any personal data.';
+$string['modulename'] = 'mind map';
+$string['modulename_help'] = 'Users can make a mind map.';
+$string['pluginname'] = 'mind map';
+$string['privacy:metadata'] = 'mind map plugin does not store any personal data.';
