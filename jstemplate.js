@@ -1,4 +1,3 @@
-
 // Globale Variablen und Konstanten
 let nodeCounter = 0;
 let mindmapData = [];
