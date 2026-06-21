@@ -1,4 +1,3 @@
-    
     <style>
         #[[color_theme#id]] {
             background-color: #f8f9fa;
@@ -42,6 +41,62 @@
         .add-btn.drop-target {
             background-color: #d4edda;
         }
+
+        /* Drag-and-Drop direkt in der Mindmap-Ansicht (SVG) */
+        rect.node-rect {
+            cursor: grab;
+        }
+
+        rect.node-rect.mindmap-dragging {
+            opacity: 0.55;
+            outline: 2px dashed #1f2937;
+            outline-offset: 2px;
+        }
+
+        .mindmap-drag-ghost {
+            position: fixed;
+            z-index: 999999;
+            pointer-events: none;
+            background: #111827;
+            color: #ffffff;
+            padding: 8px 14px;
+            border: 2px solid #ffffff;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            font-family: Inter, system-ui, sans-serif;
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5);
+            max-width: 220px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            transform: translate(-50%, -140%);
+        }
+
+        .mindmap-drop-indicator {
+            position: fixed;
+            height: 4px;
+            background: #007bff;
+            border-radius: 2px;
+            pointer-events: none;
+            z-index: 999998;
+            display: none;
+            box-shadow: 0 0 4px rgba(0, 123, 255, 0.8);
+        }
+
+        rect.node-rect.mindmap-drag-over {
+            stroke: #007bff !important;
+            stroke-width: 3px !important;
+            filter: drop-shadow(0 0 4px rgba(0, 123, 255, 0.6));
+        }
+
+        /* Fehler-/Erfolgs-/Warnungs-Modals müssen immer über dem Import-Modal liegen */
+        #errorModal,
+        #successModal,
+        #warningModal,
+        #helpModal {
+            z-index: 1100;
+        }
     </style>
 
 <div class="main-content" id="fullscreen_mindmap">
@@ -50,6 +105,8 @@
             <div class="mindmap_buttons">
                 <button type="button" class="btn btn-light toggle-editor-btn" onclick="toggleEditor()"
                     title="Listenmodus umschalten"><i class="fa-solid fa-list"></i></button>
+                <button type="button" class="btn btn-light" onclick="openImportModal()" title="Mermaid-Code importieren"><i
+                        class="fa-solid fa-file-import"></i></button>
                 <button type="button" class="btn btn-light" onclick="zoomSvg(1.2)" title="Hineinzoomen"><i
                         class="fa-solid fa-magnifying-glass-plus"></i></button>
                 <button type="button" class="btn btn-light" onclick="zoomSvg(1/1.2)" title="Herauszoomen"><i
@@ -58,6 +115,8 @@
                         class="fa-solid fa-arrows-to-circle"></i></button>
                 <button type="button" class="btn btn-light toggle-fullscreen-btn" onclick="togglePresentationMode()" title="Präsentationsmodus"><i
                         class="fa-solid fa-person-chalkboard"></i></button>
+                <button type="button" class="btn btn-light" onclick="openHelpModal()" title="Hilfe / Anleitung"><i
+                        class="fa-solid fa-circle-question"></i></button>
                 [[color_theme]]
             </div>
         </div>
@@ -116,6 +175,52 @@
         </div>
     </div>
 
+    <div id="importModal" class="mindmap-modal">
+        <div class="mindmap-modal-content" style="max-width: 600px;">
+            <h3>Mermaid-Code importieren</h3>
+            <p style="color: #b91c1c; font-weight: 600;">
+                Achtung: Beim Import wird die aktuelle Mindmap vollständig überschrieben! Dieser Vorgang kann nicht
+                rückgängig gemacht werden.
+            </p>
+            <p style="margin-top: -12px; font-size: 13px;">
+                Füge hier Mermaid-Mindmap-Code ein (Standard-Syntax mit Einrückung, z.&nbsp;B. <code>root((Text))</code>).
+                Einzelne Knotentexte dürfen maximal 150 Zeichen lang sein.
+            </p>
+            <textarea id="importMermaidTextarea" class="export-input" rows="10"
+                style="width: 100%; box-sizing: border-box;"
+                placeholder="mindmap&#10;  root((Hauptthema))&#10;    Unterknoten 1&#10;      Unterunterknoten&#10;    Unterknoten 2"></textarea>
+            <div class="mindmap-modal-buttons" style="margin-top: 16px;">
+                <button type="button" class="btn btn-secondary" onclick="closeImportModal()">Abbrechen</button>
+                <button type="button" class="btn btn-danger" onclick="confirmImportMermaidCode()">Überschreiben &amp;
+                    importieren</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="helpModal" class="mindmap-modal">
+        <div class="mindmap-modal-content" style="max-width: 560px; text-align: left;">
+            <h3>Anleitung</h3>
+            <ul style="padding-left: 20px; margin: 0; line-height: 1.6;">
+                <li><strong>Knoten bearbeiten:</strong> Auf einen Knoten klicken, um ihn umzubenennen, zu löschen
+                    oder einen neuen Unterknoten hinzuzufügen.</li>
+                <li><strong>Als Unterknoten ablegen:</strong> Einen Knoten greifen und genau auf einen anderen
+                    Knoten ziehen – er wird dort als Unterknoten eingeordnet.</li>
+                <li><strong>Reihenfolge ändern:</strong> Einen Knoten greifen und über oder unter einem
+                    Geschwisterknoten loslassen (nicht direkt auf ihm) – er wird davor bzw. danach einsortiert.</li>
+                <li><strong>Listenmodus:</strong> Über das Listen-Symbol lässt sich zwischen Mindmap-Ansicht und
+                    Listenansicht umschalten; dort funktioniert das Verschieben per Drag &amp; Drop genauso.</li>
+                <li><strong>Mermaid-Code importieren:</strong> Über das Import-Symbol kann fertiger Mermaid-Mindmap-Code
+                    eingefügt werden. Achtung: Das überschreibt die aktuelle Mindmap vollständig.</li>
+                <li><strong>Zoom &amp; Ansicht:</strong> Mit den Lupen-Symbolen rein-/rauszoomen, mit dem
+                    Zurücksetzen-Symbol den Zoom zurücksetzen.</li>
+                <li><strong>Präsentationsmodus:</strong> Zeigt die Mindmap im Vollbild zum Vorstellen an.</li>
+            </ul>
+            <div class="mindmap-modal-buttons" style="margin-top: 16px;">
+                <button type="button" class="btn btn-primary" onclick="closeHelpModal()">Verstanden</button>
+            </div>
+        </div>
+    </div>
+
     <script>
  
    let BRANCH_COLORS = BRANCH_COLORS_SCHEMES['Standard'].colors;
@@ -164,6 +269,193 @@
                     welcomeMessage.style.display = 'block';
                 }
             }
+        };
+
+        // Extrahiert den reinen Knotentext aus einer Mermaid-Zeile, z.B.
+        // "root((mindmap))" -> "mindmap", "id[Text]" -> "Text", "Origins" -> "Origins"
+        const extractMermaidNodeText = (rawLine) => {
+            let line = rawLine.replace(/\r$/, '');
+            const trimmed = line.trim();
+
+            // Kommentare, Icon- und Klassenzeilen werden ignoriert
+            if (!trimmed || trimmed.startsWith('%%') || trimmed.startsWith('::icon') ||
+                trimmed.startsWith(':::') || trimmed.startsWith('class ')) {
+                return null;
+            }
+
+            let text = trimmed;
+            // <br/>, <br>, <br /> als Leerzeichen behandeln
+            text = text.replace(/<br\s*\/?>/gi, ' ');
+
+            // Optionales Node-ID-Präfix vor der ersten Klammer abtrennen, z.B. "id((Text))" -> "((Text))"
+            const idMatch = text.match(/^([A-Za-z0-9_-]*)\s*([\(\[\{].*[\)\]\}])\s*$/s);
+            if (idMatch) text = idMatch[2];
+
+            // Äußere Formen (Kreis, Rechteck, Kachel, ...) iterativ entfernen
+            const wraps = [
+                ['(((', ')))'], ['((', '))'], ['([', '])'], ['[(', ')]'],
+                ['{{', '}}'], ['[[', ']]'],
+                ['(', ')'], ['[', ']'], ['{', '}']
+            ];
+            let changed = true;
+            while (changed) {
+                changed = false;
+                const t = text.trim();
+                for (const [open, close] of wraps) {
+                    if (t.startsWith(open) && t.endsWith(close) && t.length >= open.length + close.length) {
+                        text = t.slice(open.length, t.length - close.length);
+                        changed = true;
+                        break;
+                    }
+                }
+            }
+
+            text = text.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+            return text || null;
+        };
+
+        // Entfernt einen optionalen YAML-Frontmatter-Block (--- ... ---) am Anfang des Mermaid-Codes,
+        // z.B. "---\nconfig:\n  layout: tidy-tree\n---"
+        const stripMermaidFrontmatter = (code) => {
+            const lines = code.split('\n');
+            if (lines.length && lines[0].trim() === '---') {
+                for (let i = 1; i < lines.length; i++) {
+                    if (lines[i].trim() === '---') {
+                        return lines.slice(i + 1).join('\n');
+                    }
+                }
+                // Kein schließendes "---" gefunden -> Frontmatter unvollständig
+                return null;
+            }
+            return code;
+        };
+
+        // Wandelt echten Mermaid-Mindmap-Code (Einrückung-basiert, mehrzeilig) in das
+        // interne Pipe/Tilde-Format ("mindmap|root(Text)|~Kind|~~Enkel") um.
+        // Gibt { code, error } zurück - bei ungültiger Struktur ist code === null und error gesetzt.
+        const convertMermaidToInternalFormat = (rawCode) => {
+            const withoutFrontmatter = stripMermaidFrontmatter(rawCode);
+            if (withoutFrontmatter === null) {
+                return { code: null, error: 'Der YAML-Frontmatter-Block (--- ... ---) ist nicht korrekt geschlossen.' };
+            }
+
+            const allLines = withoutFrontmatter.split('\n');
+            const nonEmptyLines = allLines.filter(l => l.trim().length > 0);
+            if (!nonEmptyLines.length) {
+                return { code: null, error: 'Der eingefügte Code enthält keinen Inhalt.' };
+            }
+
+            // Es muss eine "mindmap"-Zeile als Diagrammtyp vorhanden sein (Pflicht in echtem Mermaid-Code)
+            const mindmapIndex = nonEmptyLines.findIndex(l => l.trim().toLowerCase() === 'mindmap');
+            if (mindmapIndex === -1) {
+                return { code: null, error: 'Es wurde keine Zeile "mindmap" gefunden. Der Code muss mit dem Diagrammtyp "mindmap" beginnen.' };
+            }
+
+            const lines = nonEmptyLines.slice(mindmapIndex + 1);
+            if (!lines.length) {
+                return { code: null, error: 'Nach der Zeile "mindmap" wurden keine Knoten gefunden.' };
+            }
+
+            const result = ['mindmap'];
+            const indentStack = []; // {indent, level}
+            let rootFound = false;
+
+            for (const rawLine of lines) {
+                const indent = (rawLine.match(/^[ \t]*/) || [''])[0]
+                    .replace(/\t/g, '    ').length;
+                const text = extractMermaidNodeText(rawLine);
+                if (!text) continue;
+
+                while (indentStack.length && indent <= indentStack[indentStack.length - 1].indent) {
+                    indentStack.pop();
+                }
+                const level = indentStack.length;
+
+                if (level === 0) {
+                    // Es darf genau einen Knoten auf der obersten (ersten) Ebene geben - den Root-Knoten.
+                    // Jede weitere Zeile auf dieser Ebene wird abgelehnt.
+                    if (rootFound) {
+                        return {
+                            code: null,
+                            error: `Es darf nur eine oberste Ebene (ein Root-Knoten) geben. Die Zeile "${text}" ist nicht eingerückt und würde einen zweiten Root-Knoten erzeugen.`
+                        };
+                    }
+                    rootFound = true;
+                    result.push(`root(${text})`);
+                } else {
+                    result.push('~'.repeat(level) + text);
+                }
+                indentStack.push({ indent, level });
+            }
+
+            if (!rootFound) {
+                return { code: null, error: 'Es wurde kein Root-Knoten gefunden. Die erste Zeile nach "mindmap" muss der nicht eingerückte Hauptknoten sein.' };
+            }
+            return { code: result.join('|'), error: null };
+        };
+
+        // Erkennt, ob es sich um echten (mehrzeiligen) Mermaid-Code oder bereits um
+        // das interne Pipe-Format handelt, und konvertiert bei Bedarf.
+        // Gibt immer { code, error } zurück.
+        const normalizeImportedMermaidCode = (code) => {
+            const trimmed = code.trim();
+            const isMultiline = /\r?\n/.test(trimmed);
+            const looksLikeInternalFormat = !isMultiline && trimmed.includes('|');
+
+            if (looksLikeInternalFormat) return { code: trimmed, error: null };
+            return convertMermaidToInternalFormat(trimmed);
+        };
+
+        // Mermaid-Code-Import (Bearbeitungsmodus)
+        const openImportModal = () => {
+            const textarea = document.getElementById('importMermaidTextarea');
+            if (textarea) textarea.value = '';
+            const modal = document.getElementById('importModal');
+            if (modal) modal.style.display = 'flex';
+        };
+
+        const closeImportModal = () => {
+            const modal = document.getElementById('importModal');
+            if (modal) modal.style.display = 'none';
+        };
+
+        const openHelpModal = () => {
+            const modal = document.getElementById('helpModal');
+            if (modal) modal.style.display = 'flex';
+        };
+
+        const closeHelpModal = () => {
+            const modal = document.getElementById('helpModal');
+            if (modal) modal.style.display = 'none';
+        };
+
+        const confirmImportMermaidCode = () => {
+            const textarea = document.getElementById('importMermaidTextarea');
+            if (!textarea) return;
+            const code = textarea.value.trim();
+
+            if (!code) {
+                showErrorModal('Bitte füge einen Mermaid-Code ein.');
+                return;
+            }
+            if (!mermaidInput) {
+                showErrorModal('Interner Fehler: Das Eingabefeld für den Mermaid-Code wurde nicht gefunden.');
+                return;
+            }
+
+            const { code: internalCode, error } = normalizeImportedMermaidCode(code);
+            if (!internalCode || internalCode === 'mindmap') {
+                showErrorModal(error || 'Der eingefügte Mermaid-Code konnte nicht gelesen werden. Bitte überprüfe die Syntax.');
+                return;
+            }
+
+            mermaidInput.value = internalCode;
+            nodeCounter = 0;
+            hasInteractedWithRoot = true;
+            closeImportModal();
+            initializeFromMermaidCode();
+            renderMindmap();
+            showSuccessModal('Die Mindmap wurde erfolgreich importiert.');
         };
 
         // Initialization
@@ -1141,7 +1433,7 @@
             const drawConnections = node => {
                 node.children.forEach(child => {
                     const { fromX, fromY, toX, toY } = getConnectionPoint(node, child);
-                    svg += `<line x1="${fromX}" y1="${fromY}" x2="${toX}" y2="${toY}" stroke="${BRANCH_COLORS[child.branchIndex % BRANCH_COLORS.length] || '#667eea'}" stroke-width="2" stroke-linecap="round"/>`;
+                    svg += `<line data-from="${node.id}" data-to="${child.id}" class="node-connector" x1="${fromX}" y1="${fromY}" x2="${toX}" y2="${toY}" stroke="${BRANCH_COLORS[child.branchIndex % BRANCH_COLORS.length] || '#667eea'}" stroke-width="2" stroke-linecap="round"/>`;
                     drawConnections(child);
                 });
             };
@@ -1207,10 +1499,305 @@
         };
 
         // Render mind maps
+        // Drag-and-Drop direkt in der Mindmap-Ansicht (SVG): Knoten auf einen anderen Knoten
+        // ziehen, um ihn dort als Unterknoten abzulegen. Nutzt dieselbe moveNodeAdvanced-Logik
+        // wie der Listenmodus.
+        let mindmapJustDragged = false;
+
+        const getMindmapNodeIdAt = (x, y, excludeId) => {
+            const el = document.elementFromPoint(x, y);
+            const target = el?.closest('rect.node-rect, text.node-text');
+            if (!target) return null;
+            const id = parseInt(target.getAttribute('data-node-id'));
+            if (id === excludeId || Number.isNaN(id)) return null;
+            return id;
+        };
+
+        const setupMindmapNodeDragAndDrop = (svgContainer) => {
+            svgContainer.querySelectorAll('rect.node-rect').forEach(rect => {
+                rect.addEventListener('mousedown', startMindmapNodeDrag);
+                rect.addEventListener('touchstart', startMindmapNodeDrag, { passive: false });
+            });
+        };
+
+        const showMindmapDropIndicator = (targetRect, position) => {
+            let indicator = document.querySelector('.mindmap-drop-indicator');
+            if (!indicator) {
+                indicator = document.createElement('div');
+                indicator.className = 'mindmap-drop-indicator';
+                document.body.appendChild(indicator);
+            }
+            indicator.style.left = `${targetRect.left}px`;
+            indicator.style.width = `${targetRect.width}px`;
+            indicator.style.top = `${position === 'before' ? targetRect.top - 2 : targetRect.bottom - 1}px`;
+            indicator.style.display = 'block';
+        };
+
+        const removeMindmapDropIndicator = () => {
+            const indicator = document.querySelector('.mindmap-drop-indicator');
+            if (indicator) indicator.remove();
+        };
+
+        // Ermittelt Zielknoten und Drop-Art (Unterknoten vs. davor/danach einsortieren)
+        // anhand der Cursor-/Fingerposition.
+        // Regel: Maus/Finger direkt AUF einem Knoten -> als Unterknoten ablegen.
+        // Maus/Finger ÜBER oder UNTER einem Knoten (in der Lücke, nicht direkt darauf) -> Reihenfolge ändern.
+        const getMindmapDropInfo = (x, y, draggedId) => {
+            const draggedNodeData = mindmapData.find(n => n.id === draggedId);
+            const targetId = getMindmapNodeIdAt(x, y, draggedId);
+
+            if (targetId !== null) {
+                // Cursor/Finger ist direkt auf einem Knoten -> immer als Unterknoten ablegen
+                const targetEl = document.querySelector(`rect.node-rect[data-node-id="${targetId}"]`);
+                if (!targetEl) return { targetId: null, dropType: null, targetEl: null, targetRect: null };
+                const targetRect = targetEl.getBoundingClientRect();
+                return { targetId, dropType: 'child', targetEl, targetRect };
+            }
+
+            // Kein Knoten direkt unter dem Cursor, z.B. in der Lücke zwischen zwei
+            // Geschwisterknoten - nächstgelegenen Geschwisterknoten anhand der Y-Position suchen.
+            if (!draggedNodeData || draggedNodeData.level === 0) {
+                return { targetId: null, dropType: null, targetEl: null, targetRect: null };
+            }
+            const siblingEls = Array.from(document.querySelectorAll('rect.node-rect')).filter(el => {
+                const id = parseInt(el.getAttribute('data-node-id'));
+                if (id === draggedId) return false;
+                const data = mindmapData.find(n => n.id === id);
+                return data && data.parent === draggedNodeData.parent;
+            });
+            let closest = null;
+            let closestDist = Infinity;
+            siblingEls.forEach(el => {
+                const r = el.getBoundingClientRect();
+                if (x < r.left - 80 || x > r.right + 80) return; // grob in derselben Spalte/Ast
+                const centerY = r.top + r.height / 2;
+                const dist = Math.abs(y - centerY);
+                if (dist < closestDist) {
+                    closestDist = dist;
+                    closest = { el, rect: r, id: parseInt(el.getAttribute('data-node-id')), centerY };
+                }
+            });
+            if (closest && closestDist < 250) {
+                const dropType = y < closest.centerY ? 'before' : 'after';
+                return { targetId: closest.id, dropType, targetEl: closest.el, targetRect: closest.rect };
+            }
+            return { targetId: null, dropType: null, targetEl: null, targetRect: null };
+        };
+
+        const startMindmapNodeDrag = (e) => {
+            if (e.type === 'touchstart' && e.touches.length > 1) return;
+            const rect = e.currentTarget;
+            const nodeId = parseInt(rect.getAttribute('data-node-id'));
+            const startPoint = e.type === 'touchstart' ? e.touches[0] : e;
+            const startX = startPoint.clientX;
+            const startY = startPoint.clientY;
+            let dragging = false;
+            let ghost = null;
+
+            const onMove = (moveEvent) => {
+                const point = moveEvent.type === 'touchmove' ? moveEvent.touches[0] : moveEvent;
+                if (!point) return;
+                const dx = point.clientX - startX;
+                const dy = point.clientY - startY;
+
+                if (!dragging && Math.hypot(dx, dy) > 6) {
+                    dragging = true;
+                    mindmapJustDragged = true;
+                    rect.classList.add('mindmap-dragging');
+                    document.body.style.cursor = 'grabbing';
+                    const existingOverlay = document.querySelector('.node-action-overlay, .input-overlay');
+                    if (existingOverlay) existingOverlay.remove();
+
+                    const draggedNodeData = mindmapData.find(n => n.id === nodeId);
+                    ghost = document.createElement('div');
+                    ghost.className = 'mindmap-drag-ghost';
+                    ghost.textContent = draggedNodeData ? draggedNodeData.text : '';
+                    ghost.style.left = `${point.clientX}px`;
+                    ghost.style.top = `${point.clientY}px`;
+                    document.body.appendChild(ghost);
+                }
+
+                if (dragging) {
+                    if (moveEvent.cancelable) moveEvent.preventDefault();
+                    if (ghost) {
+                        ghost.style.left = `${point.clientX}px`;
+                        ghost.style.top = `${point.clientY}px`;
+                    }
+                    document.querySelectorAll('.mindmap-drag-over').forEach(el => el.classList.remove('mindmap-drag-over'));
+                    removeMindmapDropIndicator();
+                    const { targetId, dropType, targetEl, targetRect } = getMindmapDropInfo(point.clientX, point.clientY, nodeId);
+                    if (targetId !== null) {
+                        if (dropType === 'child') {
+                            targetEl.classList.add('mindmap-drag-over');
+                        } else {
+                            showMindmapDropIndicator(targetRect, dropType);
+                        }
+                    }
+                }
+            };
+
+            const onUp = (upEvent) => {
+                document.removeEventListener('mousemove', onMove);
+                document.removeEventListener('mouseup', onUp);
+                document.removeEventListener('touchmove', onMove);
+                document.removeEventListener('touchend', onUp);
+                document.body.style.cursor = '';
+                rect.classList.remove('mindmap-dragging');
+                document.querySelectorAll('.mindmap-drag-over').forEach(el => el.classList.remove('mindmap-drag-over'));
+                removeMindmapDropIndicator();
+                if (ghost) ghost.remove();
+
+                if (dragging) {
+                    const point = upEvent.type === 'touchend' ? upEvent.changedTouches[0] : upEvent;
+                    if (point) {
+                        const { targetId, dropType } = getMindmapDropInfo(point.clientX, point.clientY, nodeId);
+                        if (targetId !== null) {
+                            moveNodeAdvanced(nodeId, targetId, dropType);
+                        }
+                    }
+                    setTimeout(() => { mindmapJustDragged = false; }, 300);
+                }
+            };
+
+            document.addEventListener('mousemove', onMove);
+            document.addEventListener('mouseup', onUp);
+            document.addEventListener('touchmove', onMove, { passive: false });
+            document.addEventListener('touchend', onUp);
+        };
+
+        // FLIP-Animation: merkt sich die alten Positionen von Knoten/Verbindungen, damit
+        // Strukturänderungen (z.B. ein Knoten wechselt von links nach rechts) sanft animiert
+        // statt abrupt gesprungen dargestellt werden.
+        const captureMindmapPositions = (svgContainer) => {
+            const positions = { rects: {}, texts: {}, lines: {} };
+            if (!svgContainer) return positions;
+
+            svgContainer.querySelectorAll('rect.node-rect').forEach(el => {
+                positions.rects[el.getAttribute('data-node-id')] = {
+                    x: el.getAttribute('x'), y: el.getAttribute('y'),
+                    width: el.getAttribute('width'), height: el.getAttribute('height')
+                };
+            });
+
+            const textCounts = {};
+            svgContainer.querySelectorAll('text.node-text').forEach(el => {
+                const id = el.getAttribute('data-node-id');
+                textCounts[id] = (textCounts[id] || 0);
+                positions.texts[`${id}-${textCounts[id]}`] = { x: el.getAttribute('x'), y: el.getAttribute('y') };
+                textCounts[id]++;
+            });
+
+            svgContainer.querySelectorAll('line.node-connector').forEach(el => {
+                const key = `${el.getAttribute('data-from')}-${el.getAttribute('data-to')}`;
+                positions.lines[key] = {
+                    x1: el.getAttribute('x1'), y1: el.getAttribute('y1'),
+                    x2: el.getAttribute('x2'), y2: el.getAttribute('y2')
+                };
+            });
+
+            return positions;
+        };
+
+        const animateMindmapTransition = (svgContainer, oldPositions) => {
+            if (!svgContainer || !Object.keys(oldPositions.rects).length) return;
+
+            const rectAnimations = [];
+            svgContainer.querySelectorAll('rect.node-rect').forEach(el => {
+                const old = oldPositions.rects[el.getAttribute('data-node-id')];
+                if (!old) return;
+                rectAnimations.push({
+                    el,
+                    from: { x: parseFloat(old.x), y: parseFloat(old.y), width: parseFloat(old.width), height: parseFloat(old.height) },
+                    to: { x: parseFloat(el.getAttribute('x')), y: parseFloat(el.getAttribute('y')), width: parseFloat(el.getAttribute('width')), height: parseFloat(el.getAttribute('height')) }
+                });
+            });
+
+            const textAnimations = [];
+            const textCounts = {};
+            svgContainer.querySelectorAll('text.node-text').forEach(el => {
+                const id = el.getAttribute('data-node-id');
+                textCounts[id] = (textCounts[id] || 0);
+                const old = oldPositions.texts[`${id}-${textCounts[id]}`];
+                textCounts[id]++;
+                if (!old) return;
+                textAnimations.push({
+                    el,
+                    from: { x: parseFloat(old.x), y: parseFloat(old.y) },
+                    to: { x: parseFloat(el.getAttribute('x')), y: parseFloat(el.getAttribute('y')) }
+                });
+            });
+
+            const lineAnimations = [];
+            svgContainer.querySelectorAll('line.node-connector').forEach(el => {
+                const old = oldPositions.lines[`${el.getAttribute('data-from')}-${el.getAttribute('data-to')}`];
+                if (!old) return;
+                lineAnimations.push({
+                    el,
+                    from: { x1: parseFloat(old.x1), y1: parseFloat(old.y1), x2: parseFloat(old.x2), y2: parseFloat(old.y2) },
+                    to: { x1: parseFloat(el.getAttribute('x1')), y1: parseFloat(el.getAttribute('y1')), x2: parseFloat(el.getAttribute('x2')), y2: parseFloat(el.getAttribute('y2')) }
+                });
+            });
+
+            if (!rectAnimations.length && !textAnimations.length && !lineAnimations.length) return;
+
+            // Startwerte (alte Position) sofort setzen, damit der Sprung zur neuen Position nicht zu sehen ist
+            rectAnimations.forEach(({ el, from }) => {
+                el.setAttribute('x', from.x);
+                el.setAttribute('y', from.y);
+                el.setAttribute('width', from.width);
+                el.setAttribute('height', from.height);
+            });
+            textAnimations.forEach(({ el, from }) => {
+                el.setAttribute('x', from.x);
+                el.setAttribute('y', from.y);
+            });
+            lineAnimations.forEach(({ el, from }) => {
+                el.setAttribute('x1', from.x1);
+                el.setAttribute('y1', from.y1);
+                el.setAttribute('x2', from.x2);
+                el.setAttribute('y2', from.y2);
+            });
+
+            const duration = 700; // ms
+            const easeInOutQuad = t => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
+            let startTime = null;
+
+            const step = (timestamp) => {
+                if (startTime === null) startTime = timestamp;
+                const elapsed = timestamp - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                const eased = easeInOutQuad(progress);
+
+                rectAnimations.forEach(({ el, from, to }) => {
+                    el.setAttribute('x', from.x + (to.x - from.x) * eased);
+                    el.setAttribute('y', from.y + (to.y - from.y) * eased);
+                    el.setAttribute('width', from.width + (to.width - from.width) * eased);
+                    el.setAttribute('height', from.height + (to.height - from.height) * eased);
+                });
+                textAnimations.forEach(({ el, from, to }) => {
+                    el.setAttribute('x', from.x + (to.x - from.x) * eased);
+                    el.setAttribute('y', from.y + (to.y - from.y) * eased);
+                });
+                lineAnimations.forEach(({ el, from, to }) => {
+                    el.setAttribute('x1', from.x1 + (to.x1 - from.x1) * eased);
+                    el.setAttribute('y1', from.y1 + (to.y1 - from.y1) * eased);
+                    el.setAttribute('x2', from.x2 + (to.x2 - from.x2) * eased);
+                    el.setAttribute('y2', from.y2 + (to.y2 - from.y2) * eased);
+                });
+
+                if (progress < 1) {
+                    requestAnimationFrame(step);
+                }
+            };
+
+            requestAnimationFrame(step);
+        };
+
         const renderMindmap = () => {
             if (!mermaidInput) return;
             mermaidInput.value = generateMermaidCode();
             if (!previewContainer) return;
+            const oldPositions = captureMindmapPositions(previewContainer.querySelector('svg'));
             previewContainer.innerHTML = '<div class="loading">Rendere Mindmap...</div>';
             try {
                 const root = buildTreeFromData();
@@ -1220,7 +1807,13 @@
                 if (existingOverlay) existingOverlay.remove();
                 const svgContainer = previewContainer.querySelector('svg');
                 if (svgContainer) {
+                    animateMindmapTransition(svgContainer, oldPositions);
+                    setupMindmapNodeDragAndDrop(svgContainer);
                     svgContainer.addEventListener('click', (e) => {
+                        if (mindmapJustDragged) {
+                            mindmapJustDragged = false;
+                            return;
+                        }
                         e.preventDefault();
                         e.stopPropagation();
                         const existingOverlay = document.querySelector('.node-action-overlay, .input-overlay');
